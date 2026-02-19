@@ -2,3 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Intermediate debug files (includes wide/long format trees when debug_mode=TRUE)
+input_data/TreeScan_input_files/intermediate/
+
+# Downloaded ICD-10 files (can be re-downloaded)
+input_data/ICD10_code_tree/icd10cm_tabular_*.xml
+input_data/ICD10_code_tree/icd10cm_codes_*.txt
