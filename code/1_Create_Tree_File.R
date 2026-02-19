@@ -1,17 +1,22 @@
-## CREATE TREE FILES FOR ASYNDROMIC TREESCAN ANALYSES
-## Ramona Lall & Alison Levin-Rector
-## October 2025
+#///////////////////////////////////////////////////////////////////////////////
+#' CREATE TREE FILES FOR ASYNDROMIC TREESCAN ANALYSES
+#' Ramona Lall & Alison Levin-Rector
+#' October 2025
 #
-## PART 1:
-## READ IN XML FILES TO CREATE TREE FILES IN LONG AND WIDE FORMAT
+#' PART 1:
+#' READ IN XML FILES TO CREATE TREE FILES IN LONG AND WIDE FORMAT
 #
-## For PARTS 1 & 2: Download ICD-10 Files from https://www.cms.gov/medicare/coding-billing/icd-10-codes:
-# 1) icd10cm_tabular_[year].xml from Code Tables, Tabular and Index ZIP file
-# includes all codes except at Level 8
+#' For PARTS 1 & 2: Download ICD-10 Files from
+#'  https://www.cms.gov/medicare/coding-billing/icd-10-codes:
+#' 1) icd10cm_tabular_[year].xml from Code Tables, Tabular and Index ZIP file
+#' includes all codes except at Level 8
 #
-# 2) icd10cm_codes_[year].txt from Code Descriptions in Tabular Order ZIP file
-# includes all codes from Level 5 to Level 8
+#' 2) icd10cm_codes_[year].txt from Code Descriptions in Tabular Order ZIP file
+#' includes all codes from Level 5 to Level 8
+#///////////////////////////////////////////////////////////////////////////////
 
+
+#///////////////////////////////////////////////////////////////////////////////
 #' Create Tree Files for TreeScan Analysis
 #' 
 #' @param year Numeric year for ICD-10-CM codes (default: 2026)
@@ -71,14 +76,14 @@ create_tree_file <- function(year = 2026, debug_mode = FALSE) {
   huge_xml_dict <- xml_find_all(icd10_xml, "//ICD10CM.tabular/chapter")
   ic(length(huge_xml_dict))
   
-  ## Create long tree from xml -------------------------------------------------
+  ## Step 1: Create long tree from xml -------------------------------------------------
   message("→ Step 1: Initialize long format tree from XML...")
   # Initialize list to collect data
   tree_data <- list()
   # Add root manually
   tree_data[[length(tree_data) + 1]] <- c("Root", NA, 1, "ICD-10 Root")
   
-  ## Create long tree from xml -------------------------------------------------
+  ## Step 2: Create long tree from xml -------------------------------------------------
   message("→ Step 2: Creating long format tree from XML...")
   # Initialize list to collect data
   tree_data <- list()
@@ -163,7 +168,7 @@ create_tree_file <- function(year = 2026, debug_mode = FALSE) {
   message("✓ Long format tree created with ", nrow(tree_df), " rows")
   
   
-  ## Create wide tree from xml -------------------------------------------------
+  ## Step 3: Create wide tree from xml -------------------------------------------------
   message("→ Step 3: Creating wide format tree from XML...")
   # Initialize list to collect rows
   tree_data_wide <- list()
@@ -364,21 +369,27 @@ create_tree_file <- function(year = 2026, debug_mode = FALSE) {
   
   # Export wide Tree File, which is used in creating Count File
   message("→ Exporting wide format tree file...")
-  wide_output_dir <- if (debug_mode) intermediate_dir else here("input_data", "TreeScan_input_files")
+  if (!dir.exists(intermediate_dir)) {
+    dir.create(intermediate_dir, recursive = TRUE)
+  }
   rio::export(
     icd10_treefilew_f, 
-    here(wide_output_dir, paste0("Tree_File_", year, "_wide_format.txt"))
+    here(intermediate_dir, paste0("Tree_File_", year, "_wide_format.txt"))
   )
   message("✓ Wide format saved")
   
   # Export long Tree File, which is used to update tree files with annual ICD-10 code updates
-  message("→ Exporting long format tree file...")
-  long_output_dir <- if (debug_mode) intermediate_dir else here("input_data", "TreeScan_input_files")
-  rio::export(
-    icd10_treefile_added, 
-    here(long_output_dir, paste0("Tree_File_", year, "_long_format.txt"))
-  )
-  message("✓ Long format saved")
+  if (debug_mode) {
+    message("→ Exporting long format tree file...")
+    if (!dir.exists(intermediate_dir)) {
+      dir.create(intermediate_dir, recursive = TRUE)
+    }
+    rio::export(
+      icd10_treefile_added, 
+      here(intermediate_dir, paste0("Tree_File_", year, "_long_format.txt"))
+    )
+    message("✓ Long format saved")
+  }
   
   
   ## Step 5: CREATE FINAL TREE FILE FOR TREESCAN INPUT -------------------------
