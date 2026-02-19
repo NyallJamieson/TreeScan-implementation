@@ -3,8 +3,8 @@
 .RData
 .Ruserdata
 
-# Intermediate debug files
-input_data/TreeScan_input_files/intermediate/
+# Intermediate debug files (ignore everything in intermediate/)
+input_data/TreeScan_input_files/intermediate/*
 
 # Keep Tree_File_*_wide_format.txt (needed for count file creation)
 !input_data/TreeScan_input_files/intermediate/Tree_File_*_wide_format.txt
