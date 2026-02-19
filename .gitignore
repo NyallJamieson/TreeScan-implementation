@@ -3,8 +3,11 @@
 .RData
 .Ruserdata
 
-# Intermediate debug files (includes wide/long format trees when debug_mode=TRUE)
+# Intermediate debug files
 input_data/TreeScan_input_files/intermediate/
+
+# Keep Tree_File_*_wide_format.txt (needed for count file creation)
+!input_data/TreeScan_input_files/intermediate/Tree_File_*_wide_format.txt
 
 # Downloaded ICD-10 files (can be re-downloaded)
 input_data/ICD10_code_tree/icd10cm_tabular_*.xml
