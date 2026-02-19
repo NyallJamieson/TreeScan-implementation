@@ -16,7 +16,7 @@ scan-rate-type=0
 
 [Input]
 ;tree structure filename
-tree-filename=C:\Users\nj7786\Documents\Treescan prep\media-4\Reproducing a TreeScan analysis\Tree_File_20250629.csv
+tree-filename=C:\Users\nj7786\Documents\TreeScan-implementation\Reproducing a TreeScan analysis\Tree_File_20250629.csv
 ;source type (CSV=0)
 tree-filename-SourceType=0
 ;source field map (comma separated list of integers)
@@ -30,7 +30,7 @@ tree-filename-SourceSkip=0
 ;csv source first row column header
 tree-filename-SourceFirstRowHeader=y
 ;count data filename
-count-filename=C:\Users\nj7786\Documents\Treescan prep\media-4\Reproducing a TreeScan analysis\Count_File_20250629.txt
+count-filename=C:\Users\nj7786\Documents\TreeScan-implementation\Reproducing a TreeScan analysis\Count_File_20250629.txt
 ;source type (CSV=0)
 count-filename-SourceType=0
 ;source field map (comma separated list of integers)
@@ -52,7 +52,7 @@ data-time-range=[2025/03/31,2025/06/28]
 
 [Output]
 ;results filename
-results-filename=C:\Users\nj7786\Documents\Treescan prep\media-4\Reproducing a TreeScan analysis\Results_20250629.txt
+results-filename=C:\Users\nj7786\Documents\TreeScan-implementation\Reproducing a TreeScan analysis\Results_20250629.txt
 ;create HTML results (y/n)
 results-html=y
 ;create CSV results (y/n)
@@ -124,7 +124,7 @@ excluded-tree-levels=1,2,3
 ;restrict tree nodes evaluated (y/n)
 restrict-evaluated-nodes=y
 ;not evaluated tree nodes filename
-not-evaluated-nodes-file=C:\Users\nj7786\Documents\Treescan prep\media-4\Reproducing a TreeScan analysis/Do_not_evaluate_nodes.csv
+not-evaluated-nodes-file=C:\Users\nj7786\Documents\TreeScan-implementation\Reproducing a TreeScan analysis\Do_not_evaluate_nodes.csv
 ;source type (CSV=0)
 not-evaluated-nodes-file-SourceType=0
 ;source field map (comma separated list of integers)
