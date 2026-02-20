@@ -25,6 +25,11 @@ debug_mode <- TRUE
 #  in "ED_count_data/ph_dept/Count_File_date.txt"
 data_file = "synthetic"
 
+# Force re-run flags: set to TRUE to skip file existence checks and re-run steps
+force_rerun_part1 <- FALSE
+force_rerun_part2 <- TRUE
+force_rerun_part3 <- TRUE
+
 ## PART 1: Create Tree File ----------------------------------------------------
 # Note: Will automatically download ICD-10 files from CMS if not present
 #       Took ~41 minutes to run on M1 Macbook Pro
@@ -36,11 +41,12 @@ tree_wide_output <- here::here("input_data", "TreeScan_input_files", "intermedia
                                paste0("Tree_File_", year, "_wide_format.txt"))
 
 # Check if both tree files already exist
-if (file.exists(tree_output) && file.exists(tree_wide_output)) {
+if (!force_rerun_part1 && file.exists(tree_output) && file.exists(tree_wide_output)) {
   message("✓ Tree files already exist, skipping PART 1")
 } else {
+  if (force_rerun_part1) message("→ Force re-running PART 1: Create Tree File")
   source(here::here("code", "1_Create_Tree_File.R"))
-  message("→ Running PART 1: Create Tree File")
+  if (!force_rerun_part1) message("→ Running PART 1: Create Tree File")
   create_tree_file(year = year, debug_mode = debug_mode)
 }
 
@@ -53,11 +59,12 @@ count_output <- here::here("input_data", "TreeScan_input_files", "ED_count_data"
                            paste0("Count_File_", data_file, ".txt"))
 
 # Check if count file already exists
-if (file.exists(count_output)) {
+if (!force_rerun_part2 && file.exists(count_output)) {
   message("✓ Count file already exists, skipping PART 2")
 } else {
+  if (force_rerun_part2) message("→ Force re-running PART 2: Create Count File")
   source(here::here("code", "2_Create_Count_File.R"))
-  message("→ Running PART 2: Create Count File")
+  if (!force_rerun_part2) message("→ Running PART 2: Create Count File")
   create_count_file(
     year = year,
     debug_mode = debug_mode,
@@ -67,7 +74,28 @@ if (file.exists(count_output)) {
 }
 
 ## PART 3: Run TreeScan --------------------------------------------------------
-# TODO: Add after Step 2 is working
+# Note: Executes TreeScan analysis in batch mode
+#       Requires TreeScan software installed at /opt/treescan.2.3/treescan64
+#       Download from: https://www.treescan.org/
+
+# Define expected output file from Step 3
+treescan_output <- here::here("output", "TreeScan_output_files", ph_dept,
+                              paste0("Results_", data_file, "_*.txt"))
+
+# Check if TreeScan results already exist
+if (!force_rerun_part3 && length(Sys.glob(treescan_output)) > 0) {
+  message("✓ TreeScan results already exist, skipping PART 3")
+} else {
+  if (force_rerun_part3) message("→ Force re-running PART 3: TreeScan Analysis")
+  source(here::here("code", "3_Run_TreeScan.R"))
+  if (!force_rerun_part3) message("→ Running PART 3: TreeScan Analysis")
+  run_treescan(
+    year = year,
+    debug_mode = debug_mode,
+    ph_dept = ph_dept,
+    data_file = data_file
+  )
+}
 
 
 
