@@ -295,15 +295,18 @@ create_count_file <- function(
   study_data_long=rbind(no_repeats,tie_breaker)
 
 
-  ### CREATE INPUT FILE
+  ### CREATE INPUT FILE FOR TREESCAN
   # input file is unique visit date, codes and count of that combo
   input_file=aggregate(n ~ code+severity+date, data = study_data_long[,c("date","code","severity","n")], FUN = sum)
   # add decimal
   input_file$code=ifelse(nchar(input_file$code)>=4,paste0(substr(input_file$code,1,3),".",substr(input_file$code,4,nchar(input_file$code))),input_file$code)
   # add 0- and 1-
   input_file$code1=ifelse(input_file$severity=="V",paste0("0-",input_file$code),paste0("1-",input_file$code))
-  input_file=input_file[,c("code1","date","n")]
-  names(input_file)[names(input_file)=="code1"]="code"
+  
+  # Ensure columns are in the standard format: date, code, n
+  # TreeScan will use field map 2,1,3 to read this as: code (col 2), date (col 1), count (col 3)
+  input_file <- input_file %>%
+    select(date, code = code1, n)
 
   # Create output directory if it doesn't exist
   output_dir <- here("input_data", "TreeScan_input_files", "ED_count_data", ph_dept)
@@ -314,9 +317,22 @@ create_count_file <- function(
   # Create output filename that includes the data_file parameter
   output_filename <- paste0("Count_File_", data_file, ".txt")
   output_file <- file.path(output_dir, output_filename)
+  
+  # Verify column order before writing
+  expected_cols <- c("date", "code", "n")
+  if (!identical(names(input_file), expected_cols)) {
+    stop("Count file columns are not in the correct order. Expected: ", 
+         paste(expected_cols, collapse=", "), 
+         " but got: ", paste(names(input_file), collapse=", "))
+  }
+  
   write.table(input_file, output_file, quote=FALSE, row.names=FALSE, sep="\t", eol="\r\n")
   
-  if (debug_mode) message("Count file written to: ", output_file)
+  if (debug_mode) {
+    message("Count file written to: ", output_file)
+    message("  Columns: ", paste(names(input_file), collapse=", "))
+    message("  Rows: ", nrow(input_file))
+  }
   
   # Calculate and report elapsed time
   end_time <- Sys.time()
