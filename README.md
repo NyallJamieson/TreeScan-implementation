@@ -77,13 +77,13 @@ Takes pre-cleaned ED visit data and processes it:
   - Identifies incident diagnoses (codes not seen in previous 365 days)
   - Keeps rarest code when multiple codes map to same Level 3 category
   - Formats for TreeScan input with prefixes (0- for visits, 1- for admissions)
-- **Output**: `Analysis_Count_File_[data_file].txt` in the same directory as input
+- **Output**: `Count_File_[data_file].txt` in the same directory as input
 
 #### Step 3: Run TreeScan Analysis
 Executes TreeScan in batch mode:
 - **Input**: 
   - Tree file: `Final_Tree_File_[year].csv`
-  - Count file: `Analysis_Count_File_[data_file].txt`
+  - Count file: `Count_File_[data_file].txt`
   - Parameter template: `Parameter_File.prm` (updated in place with current run's file paths)
 - **Processing**:
   - Updates `Parameter_File.prm` with current file paths and date ranges
@@ -224,7 +224,7 @@ TreeScan-implementation/
 │           └── [ph_dept]/
 │               ├── Synthetic_Dataset.txt          # Example data
 │               ├── ED_count_data_[date].txt       # Pre-cleaned ED data
-│               └── Analysis_Count_File_[data].txt # Processed count file
+│               └── Count_File_[data].txt # Processed count file
 └── output/
     └── TreeScan_output_files/        # TreeScan analysis results (TODO)
 ```
