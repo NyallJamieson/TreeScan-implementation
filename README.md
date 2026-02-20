@@ -1,6 +1,6 @@
 ## TreeScan Implementation
 
-Automated pipeline for creating TreeScan input files from ICD-10-CM codes and ED visit data.
+Automated pipeline for creating TreeScan input files from ICD-10-CM codes and ED visit data. Original code can be found [here](https://www.medrxiv.org/content/10.1101/2025.11.11.25339953v1.supplementary-material) in `Preparing TreeScan input files` for synthetic data example and `Reproducing a TreeScan analysis` for real NYC heatwave use case.
 
 ### Quick Start
 
