@@ -75,8 +75,9 @@ if (!force_rerun_part2 && file.exists(count_output)) {
 
 ## PART 3: Run TreeScan --------------------------------------------------------
 # Note: Executes TreeScan analysis in batch mode
-#       Requires TreeScan software installed at /opt/treescan.2.3/treescan64
-#       Download from: https://www.treescan.org/
+#       Requires TreeScan software from: https://www.treescan.org/
+# if running Linux: "/opt/treescan.2.3/treescan64"
+# if running MacOS: "/Applications/TreeScan.app/Contents/app/treescan"
 
 # Define expected output file from Step 3
 treescan_output <- here::here("output", "TreeScan_output_files", ph_dept,
@@ -93,7 +94,8 @@ if (!force_rerun_part3 && length(Sys.glob(treescan_output)) > 0) {
     year = year,
     debug_mode = debug_mode,
     ph_dept = ph_dept,
-    data_file = data_file
+    data_file = data_file,
+    treescan_path = "/Applications/TreeScan.app/Contents/app/treescan" # for MacOS
   )
 }
 
