@@ -1,17 +1,18 @@
-library(lubridate)
-
 update_prm_file <- function(
     prm_in = file.path(parent_dir, "params", "Parameter_File.prm"),
     prm_out = file.path(parent_dir, "params", "Parameter_File.prm"),
-    months_back = 15,
+    days_back = 90,
     end_date = Sys.Date()
 ) {
-  
   end_date <- as.Date(end_date)
-  start_date <- end_date %m-% months(months_back)
+  start_date <- end_date - days_back
   
   fmt_date <- function(x) format(x, "%Y/%m/%d")
   new_range <- paste0("[", fmt_date(start_date), ",", fmt_date(end_date), "]")
+  
+  to_prm_path <- function(...) {
+    normalizePath(file.path(...), winslash = "/", mustWork = FALSE)
+  }
   
   lines <- readLines(prm_in, warn = FALSE)
   
@@ -27,38 +28,32 @@ update_prm_file <- function(
                paste0("window-end-range=", new_range),
                lines)
   
-  # Replace any full path beginning with parent_dir-like root in file entries
-  # by rebuilding only the known path-bearing parameters
   replace_path_value <- function(lines, key, value) {
-    sub(
-      paste0("^", key, "=.*"),
-      paste0(key, "=", value),
-      lines
-    )
+    sub(paste0("^", key, "=.*"), paste0(key, "=", value), lines)
   }
   
   lines <- replace_path_value(
     lines,
     "tree-filename",
-    file.path(parent_dir, "data", "Tree_File_20250629.csv")
+    to_prm_path(parent_dir, "data", "Tree_File_20250629.csv")
   )
   
   lines <- replace_path_value(
     lines,
     "count-filename",
-    file.path(parent_dir, "data", "Analysis_Count_File.txt")
+    to_prm_path(parent_dir, "data/analysis_count_files", paste0("Analysis_Count_File_", end_date, ".txt"))
   )
   
   lines <- replace_path_value(
     lines,
     "results-filename",
-    file.path(parent_dir, "Results_20250629.txt")
+    to_prm_path(parent_dir, "results", paste0("Results_", end_date, ".txt"))
   )
   
   lines <- replace_path_value(
     lines,
     "not-evaluated-nodes-file",
-    file.path(parent_dir, "data", "Do_not_evaluate_nodes.csv")
+    to_prm_path(parent_dir, "data", "Do_not_evaluate_nodes.csv")
   )
   
   writeLines(lines, prm_out)

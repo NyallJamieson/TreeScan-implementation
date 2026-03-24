@@ -28,10 +28,13 @@ severity <- ifelse(df_all$C_Visit_Date_Source == "Admit", "A", "V")
 data <- data.frame("key" = key, "date" = date, "diagnosis_codes" = df_all$codes, "severity" = severity)
 data <- data[which(data$diagnosis_codes != "NA"), ]
 
+# Set file date for identifying dataset
+end_date <- Sys.Date()
+
 # Save data
 write.table(
   data,
-  file = paste0(parent_dir, "/data/dataset.txt"),
+  file = paste0(parent_dir, "/data/datasets/dataset_", end_date, ".txt"),
   sep = "\t",
   quote = FALSE,
   row.names = FALSE

@@ -18,8 +18,8 @@ setwd(paste0(parent_dir, "/data"))
 year <- 2025
 
 # pull in 15 months of ED visit data ending 8/20/2024
-sample_ED_data <- read.delim("dataset.txt")
-sample_ED_data<-mutate(sample_ED_data,date=ymd(date))
+sample_ED_data <- read.delim(paste0(parent_dir, "/data/datasets/dataset_", end_date, ".txt"))
+sample_ED_data <- mutate(sample_ED_data,date=ymd(date))
 class(sample_ED_data$date)
 end <- max(sample_ED_data$date)
 
@@ -75,7 +75,7 @@ eligible_visit_codes=eligible_visit_codes[grepl("Z0|Z10|Z1152|Z12|Z13|Z14|Z15|Z1
 eligible_visit_codes=eligible_visit_codes[grepl("\\bC|\\bD0|\\bD1|\\bD2|\\bD3|\\bD4|\\bQ",eligible_visit_codes$code)==F,]
 
 ## Merge with tree file in wide format to get level2 and level3 parents for each code
-icd10_treefile_wide <- read.delim(paste0("~/Treescan prep/media-3/Preparing TreeScan Input Files/files for creating the tree/Tree_File_",year,"_wide_format.txt"))
+icd10_treefile_wide <- read.delim(paste0(parent_dir, "/data/Tree_File_",year,"_wide_format.txt"))
 eligible_visit_codes=merge(eligible_visit_codes, icd10_treefile_wide[,c("Name1","Level2","Level3")],by.x="code",by.y="Name1",all.x=TRUE)
 
 # If code not recognized as belonging to tree file remove
@@ -293,7 +293,7 @@ input_file$n    <- as.integer(input_file$n)
 # Write a PURE ASCII tab-delimited file (no BOM, no UTF-16)
 write.table(
   input_file[, c("code","date","n")],
-  file = paste0(parent_dir, "/data/Analysis_count_file.txt"),
+  file = paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", end_date, ".txt"),
   sep = "\t",
   row.names = FALSE,
   col.names = TRUE,

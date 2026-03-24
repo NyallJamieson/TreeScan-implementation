@@ -7,11 +7,6 @@ library(jsonlite)
 library(readr)
 library(dplyr)
 
-# install Rnssp package
-devtools::install_github("cdcgov/Rnssp")
-# Rnssp instructions: https://cdn.ymaws.com/www.cste.org/resource/resmgr/2016billets/RStudio_ESSENCE_API_Guide_D.html
-
-
 # You also have to update your out_dir to where you want the download to save
 # for example: I want to download the data to the following directory in my PC
 # C:/Users/NYALL/Documents/Trial
@@ -25,23 +20,15 @@ out_dir <- paste0(parent_dir, "/raw_data")
 setwd(out_dir)
 
 # To do once, or when password changes - You need to put your essence username and password in
-myProfile <- create_profile()
-save(myProfile, file = paste0(parent_dir, "/myProfile.rda"))
+if (isTRUE(first_time)){
+  myProfile <- create_profile()
+  save(myProfile, file = paste0(parent_dir, "/myProfile.rda"))
+}
 
-load("~/myProfile.rda")
+load(paste0(parent_dir, "/myProfile.rda"))
 
 do_download_historical_data <- TRUE # TRUE FALSE
 do_download_addhoc_data <- TRUE # TRUE FALSE
-
-# READ
-# BEFORE
-# RUNNING:
-
-# You have to change the counties_list line yourself
-# for example if you are running for the following states in Texas:
-# Bastrop, Caldwell, Hays, Travis, Williamson,
-# then you replace line number 35 with the code commented below after the # symbol
-# counties_list <- c("tx_bastrop","tx_caldwell","tx_hays","tx_travis","tx_williamson")
 
 # Helper: build DataDetails URL
 build_datadetails_url <- function(
@@ -87,7 +74,7 @@ build_datadetails_url <- function(
 download_nssp_chunked <- function(
     end_date = Sys.Date(),
     months_back = 15,
-    chunk = c("month", "week"),
+    chunk = c("day", "month", "week"),
     out_dir,
     field_list = c(
       "C_Unique_Patient_ID",
@@ -116,26 +103,33 @@ download_nssp_chunked <- function(
   end_date <- as.Date(end_date)
   start_date <- end_date %m-% months(months_back)
   
+  # Here we try to gather what dates we need to download
+  # in a minimal way so we aren't redownloading from previous days
+  existing_files <- list.files(out_dir, pattern = "^NSSP_data_.*\\.csv$", full.names = FALSE)
+  existing_dates <- sub("^NSSP_data_(\\d{4}-\\d{2}-\\d{2})_to_\\1\\.csv$", "\\1", existing_files)
+  existing_dates <- as.Date(existing_dates, format = "%Y-%m-%d")
+  existing_dates <- existing_dates[!is.na(existing_dates)]
+  target_dates <- seq.Date(as.Date(start_date), as.Date(end_date), by = "day")
+  missing_dates <- setdiff(target_dates, existing_dates)
+  
+  
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
   
   # Build chunk boundaries
-  by_unit <- if (chunk == "month") "1 month" else "1 week"
-  breaks <- seq(from = floor_date(start_date, unit = chunk),
-                to   = ceiling_date(end_date, unit = chunk),
-                by   = by_unit)
+  by_unit <- if (chunk == "month") "1 month" else if (chunk == "week") "1 week" else "1 day"
+  breaks <- missing_dates
   
   # Ensure we cover start_date/end_date exactly
-  breaks[1] <- start_date
-  if (tail(breaks, 1) < end_date) breaks <- c(breaks, end_date)
+  if (tail(breaks, 1) < end_date) breaks <- c(breaks, end_date + 1)
   
   message(sprintf("Pulling NSSP data in %s chunks: %s to %s", chunk, start_date, end_date))
   
   files <- c()
   
-  for (i in seq_len(length(breaks) - 1)) {
+  for (i in seq_len(length(breaks))) {
     s <- as.Date(breaks[i])
     e <- as.Date(breaks[i + 1] - 1)  # inclusive end for chunk
-    if (i == length(breaks) - 1) e <- end_date
+    if (i == length(breaks)) e <- end_date
     
     url <- build_datadetails_url(
       start_date = s, end_date = e,
@@ -155,7 +149,7 @@ download_nssp_chunked <- function(
     
     # Stream directly to disk (avoids R 2GB string limit)
     api_data <- get_api_data(url, fromCSV = TRUE)
-    write_csv(api_data, out_file)
+    write.csv(api_data, out_file)
   }
   
   if (!combine) return(invisible(files))
@@ -164,13 +158,13 @@ download_nssp_chunked <- function(
   message("Combining chunks...")
   df <- bind_rows(lapply(files, read_csv, show_col_types = FALSE))
   combined_path <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date))
-  write_csv(df, combined_path)
+  write.csv(df, combined_path)
   message(sprintf("Saved combined file: %s", combined_path))
   
   invisible(list(files = files, combined = combined_path))
 }
 
-download_nssp_chunked(out_dir = out_dir, chunk = "week", combine = FALSE)
+download_nssp_chunked(out_dir = out_dir, chunk = "day", combine = FALSE)
 
 # Main: chunked downloader FOR LATER EXTENSION
 download_nssp_chunked_year <- function(
@@ -248,7 +242,7 @@ download_nssp_chunked_year <- function(
     
     # Stream directly to disk (avoids R 2GB string limit)
     api_data <- get_api_data(url, fromCSV = TRUE)
-    write_csv(api_data, out_file)
+    write.csv(api_data, out_file)
   }
   
   if (!combine) return(invisible(files))
@@ -257,7 +251,7 @@ download_nssp_chunked_year <- function(
   message("Combining chunks...")
   df <- bind_rows(lapply(files, read_csv, show_col_types = FALSE))
   combined_path <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date))
-  write_csv(df, combined_path)
+  write.csv(df, combined_path)
   message(sprintf("Saved combined file: %s", combined_path))
   
   invisible(list(files = files, combined = combined_path))
