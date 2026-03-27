@@ -16,7 +16,7 @@ scan-rate-type=0
 
 [Input]
 ;tree structure filename
-tree-filename=C:\Users\nj7786\Documents\treescan_project\data\Tree_File_20250629.csv
+tree-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Tree_File_20250629.csv
 ;source type (CSV=0)
 tree-filename-SourceType=0
 ;source field map (comma separated list of integers)
@@ -30,7 +30,7 @@ tree-filename-SourceSkip=0
 ;csv source first row column header
 tree-filename-SourceFirstRowHeader=y
 ;count data filename
-count-filename=C:\Users\nj7786\Documents\treescan_project\data\Analysis_Count_File.txt
+count-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/analysis_count_files/Analysis_Count_File_2026-03-26.txt
 ;source type (CSV=0)
 count-filename-SourceFieldMap=1,3,2
 count-filename-SourceDelimiter=
@@ -45,14 +45,14 @@ count-filename-SourceSkip=0
 count-filename-SourceFirstRowHeader=y
 ;control data filename
 control-filename=
-;date precision type (NONE=0, GENERIC=1, YEAR=2, MONTH=3, DAY=4)
+  ;date precision type (NONE=0, GENERIC=1, YEAR=2, MONTH=3, DAY=4)
 date-precision=4
 ;data time ranges: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-data-time-range=[2024/12/18,2026/03/18]
+data-time-range=[2025/12/26,2026/03/26]
 
 [Output]
 ;results filename
-results-filename=C:\Users\nj7786\Documents\treescan_project\Results_20250629.txt
+results-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/results/2026-03-26/Results_2026-03-26.txt
 ;create HTML results (y/n)
 results-html=y
 ;create CSV results (y/n)
@@ -65,7 +65,7 @@ results-nwk=n
 [Advanced Input]
 ;cuts filename
 cut-filename=
-;default cuts type (SIMPLE=0, PAIRS=1, TRIPLETS=2, ORDINAL=3, COMBINATORIAL=4)
+  ;default cuts type (SIMPLE=0, PAIRS=1, TRIPLETS=2, ORDINAL=3, COMBINATORIAL=4)
 cut-type=0
 ;allow data only on tree leaves - (y/n)
 data-only-on-leaves=n
@@ -102,9 +102,9 @@ prospective-analysis=y
 ;restrict temporal windows (y/n)
 restricted-window-range=n
 ;start data time range: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-window-start-range=[2024/12/18,2026/03/18]
+window-start-range=[2025/12/26,2026/03/26]
 ;end data time range: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-window-end-range=[2024/12/18,2026/03/18]
+window-end-range=[2025/12/26,2026/03/26]
 
 [Adjustments]
 ;perform day of week adjustments (y/n)
@@ -113,10 +113,10 @@ perform-day-of-week-adjustments=y
 apply-exclusion-data-ranges=n
 ;exclusion time ranges (semi-colon separated list of ranges: [integer,integer];[integer,integer] or [yyyy/mm/dd,yyyy/mm/dd];[yyyy/mm/dd,yyyy/mm/dd])
 exclusion-data-ranges=
-
-[Inference]
+  
+  [Inference]
 ;number of simulation replications (0, 9, 999, n999)
-monte-carlo-replications=5000
+monte-carlo-replications=99999
 ;restrict tree levels evaluated (y/n)
 restrict-tree-levels=y
 ;tree levels excluded from evaluation (csv list of unsigned integers, root level is 1)
@@ -124,7 +124,7 @@ excluded-tree-levels=1,2,3
 ;restrict tree nodes evaluated (y/n)
 restrict-evaluated-nodes=y
 ;not evaluated tree nodes filename
-not-evaluated-nodes-file=C:\Users\nj7786\Documents\treescan_project\data\Do_not_evaluate_nodes.csv
+not-evaluated-nodes-file=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Do_not_evaluate_nodes.csv
 ;source type (CSV=0)
 not-evaluated-nodes-file-SourceType=0
 ;source field map (comma separated list of integers)

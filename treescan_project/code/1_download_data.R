@@ -70,11 +70,11 @@ build_datadetails_url <- function(
   )
 }
 
-# Main: chunked downloader
 download_nssp_chunked <- function(
     end_date = Sys.Date(),
-    months_back = 15,
-    chunk = c("day", "month", "week"),
+    months_back = 16, # we set this to 16 instead of 15 so we have roughly 30 days back up incase there is a lag issue
+    refresh_days = 30,
+    chunk = c("day"),
     out_dir,
     field_list = c(
       "C_Unique_Patient_ID",
@@ -88,8 +88,10 @@ download_nssp_chunked <- function(
       "Hospital",
       "HospitalZip",
       "Patient_Zip",
-      "Patient_Country",
-      "Hospital"
+      "DischargeDiagnosisUpdates",
+      "DischargeDiagnosisMDTUpdates",
+      "DischargeDisposition",
+      "HasBeenAdmitted"
     ),
     geographySystem = "hospitalregion",
     geographies = NULL,
@@ -99,40 +101,66 @@ download_nssp_chunked <- function(
     timeResolution = "daily",
     combine = FALSE
 ) {
-  chunk <- match.arg(chunk)
+  if (chunk != "day") {
+    stop("This version is designed for daily files only. Use chunk = 'day'.")
+  }
+  
   end_date <- as.Date(end_date)
   start_date <- end_date %m-% months(months_back)
+  refresh_start <- max(start_date, end_date - (refresh_days - 1))
   
-  # Here we try to gather what dates we need to download
-  # in a minimal way so we aren't redownloading from previous days
-  existing_files <- list.files(out_dir, pattern = "^NSSP_data_.*\\.csv$", full.names = FALSE)
-  existing_dates <- sub("^NSSP_data_(\\d{4}-\\d{2}-\\d{2})_to_\\1\\.csv$", "\\1", existing_files)
+  if (!dir.exists(out_dir)) {
+    dir.create(out_dir, recursive = TRUE)
+  }
+  
+  # Find existing daily files
+  existing_files <- list.files(
+    out_dir,
+    pattern = "^NSSP_data_\\d{4}-\\d{2}-\\d{2}_to_\\d{4}-\\d{2}-\\d{2}\\.csv$",
+    full.names = FALSE
+  )
+  
+  # Only treat true daily files (start == end) as completed days
+  file_dates <- regexec("^NSSP_data_(\\d{4}-\\d{2}-\\d{2})_to_(\\d{4}-\\d{2}-\\d{2})\\.csv$", existing_files)
+  file_parts <- regmatches(existing_files, file_dates)
+  
+  existing_dates <- vapply(file_parts, function(x) {
+    if (length(x) == 3 && x[2] == x[3]) x[2] else NA_character_
+  }, character(1))
+  
   existing_dates <- as.Date(existing_dates, format = "%Y-%m-%d")
   existing_dates <- existing_dates[!is.na(existing_dates)]
-  target_dates <- seq.Date(as.Date(start_date), as.Date(end_date), by = "day")
-  missing_dates <- setdiff(target_dates, existing_dates)
   
+  # Full historical range and gap-fill dates
+  target_dates <- seq.Date(start_date, end_date, by = "day")
+  missing_dates_full <- setdiff(target_dates, existing_dates)
   
-  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  # Always refresh the most recent N days, even if they already exist
+  refresh_dates_recent <- seq.Date(refresh_start, end_date, by = "day")
   
-  # Build chunk boundaries
-  by_unit <- if (chunk == "month") "1 month" else if (chunk == "week") "1 week" else "1 day"
-  breaks <- missing_dates
+  # First fill historical gaps, then refresh recent dates
+  dates_to_download <- c(missing_dates_full, refresh_dates_recent)
+  dates_to_download <- sort(unique(as.Date(dates_to_download, origin = "1970-01-01")))
   
-  # Ensure we cover start_date/end_date exactly
-  if (tail(breaks, 1) < end_date) breaks <- c(breaks, end_date + 1)
+  if (length(dates_to_download) == 0) {
+    message("Your downloads are up to date")
+    return(invisible(NULL))
+  }
   
-  message(sprintf("Pulling NSSP data in %s chunks: %s to %s", chunk, start_date, end_date))
+  message(sprintf(
+    "Ensuring full coverage from %s to %s, then refreshing the most recent %d days (%s to %s).",
+    start_date, end_date, refresh_days, refresh_start, end_date
+  ))
   
-  files <- c()
+  files <- character(0)
   
-  for (i in seq_len(length(breaks))) {
-    s <- as.Date(breaks[i])
-    e <- as.Date(breaks[i + 1] - 1)  # inclusive end for chunk
-    if (i == length(breaks)) e <- end_date
+  for (d in dates_to_download) {
+    s <- as.Date(d)
+    e <- as.Date(d)
     
     url <- build_datadetails_url(
-      start_date = s, end_date = e,
+      start_date = s,
+      end_date = e,
       field_list = field_list,
       geographySystem = geographySystem,
       geographies = geographies,
@@ -145,114 +173,36 @@ download_nssp_chunked <- function(
     out_file <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s.csv", s, e))
     files <- c(files, out_file)
     
-    message(sprintf("Downloading %s to %s ...", s, e))
+    if (s >= refresh_start) {
+      message(sprintf("Refreshing %s ...", s))
+    } else {
+      message(sprintf("Downloading missing %s ...", s))
+    }
     
-    # Stream directly to disk (avoids R 2GB string limit)
     api_data <- get_api_data(url, fromCSV = TRUE)
-    write.csv(api_data, out_file)
+    write.csv(api_data, out_file, row.names = FALSE)
   }
   
-  if (!combine) return(invisible(files))
+  if (!combine) {
+    return(invisible(files))
+  }
   
-  # Optional combine (can be memory heavy; only do if you really need one object)
-  message("Combining chunks...")
-  df <- bind_rows(lapply(files, read_csv, show_col_types = FALSE))
-  combined_path <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date))
-  write.csv(df, combined_path)
-  message(sprintf("Saved combined file: %s", combined_path))
-  
-  invisible(list(files = files, combined = combined_path))
-}
-
-download_nssp_chunked(out_dir = out_dir, chunk = "day", combine = FALSE)
-
-# Main: chunked downloader FOR LATER EXTENSION
-download_nssp_chunked_year <- function(
-    year,
-    months_back = 12,
-    chunk = c("month", "week"),
+  message("Combining all daily files in requested range...")
+  files_to_combine <- file.path(
     out_dir,
-    field_list = c(
-      "C_Unique_Patient_ID",
-      "DischargeDiagnosis",
-      "ChiefComplaintParsed",
-      "Age",
-      "C_Visit_Date_Time",
-      "C_Visit_Date_Source",
-      "C_Patient_Class",
-      "Region",
-      "Hospital",
-      "HospitalZip",
-      "Patient_Zip",
-      "Patient_Country",
-      "Hospital"
-    ),
-    geographySystem = "hospitalregion",
-    geographies = NULL,
-    datasource = "va_hosp",
-    userId = 7410,
-    medicalGroupingSystem = "essencesyndromes",
-    timeResolution = "daily",
-    combine = FALSE
-) {
-  end_date = paste0(year,"-12-31")
+    sprintf("NSSP_data_%s_to_%s.csv", target_dates, target_dates)
+  )
+  files_to_combine <- files_to_combine[file.exists(files_to_combine)]
   
-  chunk <- match.arg(chunk)
-  end_date <- as.Date(end_date)
-  start_date <- paste0(year,"-01-01")
-  
-  out_dir <- "C:/Users/nj7786/Documents/treescan_project/data_for_interpretation"
-  
-  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-  
-  # Build chunk boundaries
-  by_unit <- if (chunk == "month") "1 month" else "1 week"
-  breaks <- seq(from = floor_date(start_date, unit = chunk),
-                to   = ceiling_date(end_date, unit = chunk),
-                by   = by_unit)
-  
-  # Ensure we cover start_date/end_date exactly
-  breaks[1] <- start_date
-  if (tail(breaks, 1) < end_date) breaks <- c(breaks, end_date)
-  
-  message(sprintf("Pulling NSSP data in %s chunks: %s to %s", chunk, start_date, end_date))
-  
-  files <- c()
-  
-  for (i in seq_len(length(breaks) - 1)) {
-    s <- as.Date(breaks[i])
-    e <- as.Date(breaks[i + 1] - 1)  # inclusive end for chunk
-    if (i == length(breaks) - 1) e <- end_date
-    
-    url <- build_datadetails_url(
-      start_date = s, end_date = e,
-      field_list = field_list,
-      geographySystem = geographySystem,
-      geographies = geographies,
-      datasource = datasource,
-      userId = userId,
-      medicalGroupingSystem = medicalGroupingSystem,
-      timeResolution = timeResolution
-    )
-    
-    out_file <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s.csv", s, e))
-    files <- c(files, out_file)
-    
-    message(sprintf("Downloading %s to %s ...", s, e))
-    
-    # Stream directly to disk (avoids R 2GB string limit)
-    api_data <- get_api_data(url, fromCSV = TRUE)
-    write.csv(api_data, out_file)
-  }
-  
-  if (!combine) return(invisible(files))
-  
-  # Optional combine (can be memory heavy; only do if you really need one object)
-  message("Combining chunks...")
-  df <- bind_rows(lapply(files, read_csv, show_col_types = FALSE))
-  combined_path <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date))
-  write.csv(df, combined_path)
+  df <- bind_rows(lapply(files_to_combine, readr::read_csv, show_col_types = FALSE))
+  combined_path <- file.path(
+    out_dir,
+    sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date)
+  )
+  write.csv(df, combined_path, row.names = FALSE)
   message(sprintf("Saved combined file: %s", combined_path))
   
   invisible(list(files = files, combined = combined_path))
 }
+
+download_nssp_chunked(out_dir = out_dir)

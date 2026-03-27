@@ -18,7 +18,7 @@ setwd(paste0(parent_dir, "/data"))
 year <- 2025
 
 # pull in 15 months of ED visit data ending 8/20/2024
-sample_ED_data <- read.delim(paste0(parent_dir, "/data/datasets/dataset_", end_date, ".txt"))
+sample_ED_data <- read.delim(paste0(parent_dir, "/data/datasets/dataset_", END_DATE, ".txt"))
 sample_ED_data <- mutate(sample_ED_data,date=ymd(date))
 class(sample_ED_data$date)
 end <- max(sample_ED_data$date)
@@ -293,7 +293,7 @@ input_file$n    <- as.integer(input_file$n)
 # Write a PURE ASCII tab-delimited file (no BOM, no UTF-16)
 write.table(
   input_file[, c("code","date","n")],
-  file = paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", end_date, ".txt"),
+  file = paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", END_DATE, ".txt"),
   sep = "\t",
   row.names = FALSE,
   col.names = TRUE,
