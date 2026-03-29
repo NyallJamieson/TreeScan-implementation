@@ -70,5 +70,5 @@ update_prm_file()
 
 # Also need to create the results file to save in
 
-dir.create(paste0("C:/Users/nj7786/Documents/treescan_project/results/", END_DATE))
+dir.create(paste0(parent_dir, "/results/", END_DATE))
 
