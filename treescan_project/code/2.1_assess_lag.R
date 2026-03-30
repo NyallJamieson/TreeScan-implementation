@@ -4,8 +4,13 @@ library(stringr)
 library(tidyr)
 library(purrr)
 library(lubridate)
+library(data.table)
+library(parallel)
+library(tibble)
 
-# Tidy ICD data
+setDTthreads(0)
+
+# Parse codes
 parse_diag_events <- function(x) {
   ev <- str_split(x, fixed("|"))[[1]]
   
@@ -16,7 +21,6 @@ parse_diag_events <- function(x) {
     filter(!is.na(event_id))
 }
 
-# Time time data
 parse_time_events <- function(x) {
   ev <- str_split(x, fixed("|"))[[1]]
   
@@ -31,46 +35,183 @@ parse_time_events <- function(x) {
     filter(!is.na(event_id))
 }
 
-# Gets code and timing for each update
-clean_nssp_updates <- function(df) {
+# Fast chunk processor
+.process_nssp_chunk <- function(chunk_df) {
+  if (nrow(chunk_df) == 0L) {
+    return(data.table(
+      row_id = integer(),
+      visit_time = as.POSIXct(character(), tz = "UTC"),
+      event_id = integer(),
+      update_time = as.POSIXct(character(), tz = "UTC"),
+      code = character()
+    ))
+  }
   
-  df %>%
+  # Keep only rows that could possibly contribute output.
+  # This does not change results; rows failing this would have returned empty anyway.
+  chunk_df <- chunk_df %>%
+    filter(
+      !is.na(DischargeDiagnosisUpdates),
+      !is.na(DischargeDiagnosisMDTUpdates),
+      DischargeDiagnosisUpdates != "",
+      DischargeDiagnosisMDTUpdates != ""
+    )
+  
+  if (nrow(chunk_df) == 0L) {
+    return(data.table(
+      row_id = integer(),
+      visit_time = as.POSIXct(character(), tz = "UTC"),
+      event_id = integer(),
+      update_time = as.POSIXct(character(), tz = "UTC"),
+      code = character()
+    ))
+  }
+  
+  # -------------------------
+  # Diagnosis side
+  # Exactly equivalent to calling parse_diag_events() row by row,
+  # but done in bulk for the chunk.
+  # -------------------------
+  diag_list <- str_split(chunk_df$DischargeDiagnosisUpdates, fixed("|"))
+  diag_n <- lengths(diag_list)
+  
+  diag_long <- data.table(
+    row_id = rep.int(chunk_df$row_id, diag_n),
+    visit_time = rep(chunk_df$visit_time, diag_n),
+    diag_ev = unlist(diag_list, use.names = FALSE)
+  )
+  
+  diag_match_event <- str_match(diag_long$diag_ev, "^\\{(\\d+)\\}")
+  diag_match_str   <- str_match(diag_long$diag_ev, "^\\{\\d+\\};;(.*)$")
+  
+  diag_tbl <- data.table(
+    row_id = diag_long$row_id,
+    visit_time = diag_long$visit_time,
+    event_id = as.integer(diag_match_event[, 2]),
+    diag_str = diag_match_str[, 2]
+  )[!is.na(event_id)]
+  
+  # -------------------------
+  # Time side
+  # Exactly equivalent to calling parse_time_events() row by row,
+  # but done in bulk for the chunk.
+  # -------------------------
+  time_list <- str_split(chunk_df$DischargeDiagnosisMDTUpdates, fixed("|"))
+  time_n <- lengths(time_list)
+  
+  time_long <- data.table(
+    row_id = rep.int(chunk_df$row_id, time_n),
+    time_ev = unlist(time_list, use.names = FALSE)
+  )
+  
+  time_match_event <- str_match(time_long$time_ev, "^\\{(\\d+)\\}")
+  time_match_time  <- str_match(
+    time_long$time_ev,
+    "^\\{\\d+\\};(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})"
+  )
+  
+  time_tbl <- data.table(
+    row_id = time_long$row_id,
+    event_id = as.integer(time_match_event[, 2]),
+    update_time = ymd_hms(time_match_time[, 2], quiet = TRUE)
+  )[!is.na(event_id)]
+  
+  # -------------------------
+  # original joined by event_id inside each row
+  # bulk equivalent is join by row_id + event_id
+  # -------------------------
+  ev_tbl <- merge(
+    diag_tbl,
+    time_tbl,
+    by = c("row_id", "event_id"),
+    all = FALSE,
+    allow.cartesian = TRUE
+  )
+  
+  if (nrow(ev_tbl) == 0L) {
+    return(data.table(
+      row_id = integer(),
+      visit_time = as.POSIXct(character(), tz = "UTC"),
+      event_id = integer(),
+      update_time = as.POSIXct(character(), tz = "UTC"),
+      code = character()
+    ))
+  }
+  
+  # -------------------------
+  # str_extract_all(...), then unnest(code), then filter(!is.na(code), code != "")
+  # -------------------------
+  code_list <- str_extract_all(
+    ev_tbl$diag_str,
+    "[A-Z][0-9][0-9A-Z](?:\\.[0-9A-Z]{1,4})?"
+  )
+  
+  code_n <- lengths(code_list)
+  
+  if (!any(code_n > 0L)) {
+    return(data.table(
+      row_id = integer(),
+      visit_time = as.POSIXct(character(), tz = "UTC"),
+      event_id = integer(),
+      update_time = as.POSIXct(character(), tz = "UTC"),
+      code = character()
+    ))
+  }
+  
+  out <- ev_tbl[rep.int(seq_len(nrow(ev_tbl)), code_n)]
+  out[, code := unlist(code_list, use.names = FALSE)]
+  
+  out <- out[
+    !is.na(code) & code != "",
+    .(row_id, visit_time, event_id, update_time, code)
+  ]
+  
+  out[]
+}
+
+# Fast main cleaner
+clean_nssp_updates <- function(df, chunk_size = 100000L, cores = 1L) {
+  df_prepped <- df %>%
     mutate(
       row_id = row_number(),
       visit_time = ymd_hms(C_Visit_Date_Time, quiet = TRUE)
     ) %>%
-    select(row_id, visit_time, DischargeDiagnosisUpdates, DischargeDiagnosisMDTUpdates) %>%
-    pmap_dfr(function(row_id, visit_time, DischargeDiagnosisUpdates, DischargeDiagnosisMDTUpdates) {
-      
-      diag_tbl <- parse_diag_events(DischargeDiagnosisUpdates)
-      time_tbl <- parse_time_events(DischargeDiagnosisMDTUpdates)
-      
-      ev_tbl <- inner_join(diag_tbl, time_tbl, by = "event_id")
-      
-      if (nrow(ev_tbl) == 0) {
-        return(tibble())
-      }
-      
-      ev_tbl %>%
-        mutate(
-          row_id = row_id,
-          visit_time = visit_time,
-          code = map(
-            diag_str,
-            ~ str_extract_all(
-              .x,
-              "[A-Z][0-9][0-9A-Z](?:\\.[0-9A-Z]{1,4})?"
-            )[[1]]
-          )
-        ) %>%
-        unnest(code) %>%
-        filter(!is.na(code), code != "") %>%
-        select(row_id, visit_time, event_id, update_time, code)
-    })
+    select(row_id, visit_time, DischargeDiagnosisUpdates, DischargeDiagnosisMDTUpdates)
+  
+  n <- nrow(df_prepped)
+  if (n == 0L) {
+    return(tibble(
+      row_id = integer(),
+      visit_time = as.POSIXct(character(), tz = "UTC"),
+      event_id = integer(),
+      update_time = as.POSIXct(character(), tz = "UTC"),
+      code = character()
+    ))
+  }
+  
+  starts <- seq.int(1L, n, by = chunk_size)
+  ends <- pmin(starts + chunk_size - 1L, n)
+  idx <- Map(function(a, b) a:b, starts, ends)
+  
+  chunk_fun <- function(ii) {
+    .process_nssp_chunk(df_prepped[ii, , drop = FALSE])
+  }
+  
+  parts <- if (.Platform$OS.type != "windows" && cores > 1L) {
+    mclapply(idx, chunk_fun, mc.cores = cores)
+  } else {
+    lapply(idx, chunk_fun)
+  }
+  
+  as_tibble(rbindlist(parts, use.names = TRUE, fill = TRUE))
 }
 
-# Now tidy the data
-df_long <- clean_nssp_updates(df_all_for_lag)
+# Run main cleaning
+df_long <- clean_nssp_updates(
+  df_all_for_lag,
+  chunk_size = 100000L,
+  cores = max(1L, floor(detectCores() / 2))   # set to 1L on Windows if needed
+)
 
 # Find first appearance for each code for each patient
 first_appearance <- df_long %>%
@@ -104,7 +245,7 @@ delay_by_code <- first_appearance %>%
   ) %>%
   unnest_wider(percentiles)
 
-# Now get overall time delay distribution
+# Overall time delay distribution
 overall_delay <- first_appearance %>%
   summarise(
     percentiles = list(
@@ -123,9 +264,7 @@ overall_delay <- first_appearance %>%
   ) %>%
   unnest_wider(percentiles)
 
-# Now estimate the optimal time delay based on first elbow-like point
-
-
+# Estimate the optimal time delay based on first elbow-like point
 x <- as.numeric(overall_delay[1, 1:95])
 y <- 1:95
 
@@ -133,10 +272,8 @@ ord <- order(x)
 x <- x[ord]
 y <- y[ord]
 
-# Fit smooth curve to it
 fit <- smooth.spline(x, y, spar = 0.6)
 
-# predict derivatives on a fine grid
 xx <- seq(min(x), max(x), length.out = 500)
 p0 <- predict(fit, xx, deriv = 0)
 p1 <- predict(fit, xx, deriv = 1)
