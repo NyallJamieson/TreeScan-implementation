@@ -99,7 +99,10 @@ download_nssp_chunked <- function(
       "ModeOfArrival",
       "Travel_History",
       "TriageNotesParsed", 
-      "Discharge_Date_Time"
+      "Discharge_Date_Time",
+      "Diagnosis_Combo",
+      "TriageNotesOrig",
+      "ChiefComplaintUpdates"
     ),
     geographySystem = "hospitalregion",
     geographies = NULL,
