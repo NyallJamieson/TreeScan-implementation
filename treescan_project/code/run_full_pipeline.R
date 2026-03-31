@@ -11,7 +11,7 @@ parent_dir <- gsub("\\\\", "/", parent_dir)
 base_dir <- dirname(parent_dir)
 
 # Is this your first time installing?
-first_time <- TRUE
+first_time <- FALSE
 
 # If you're on a server, uploading treescan download unzipped automatically
 # but still needs to install!
@@ -31,7 +31,8 @@ if (isTRUE(first_time)){
     "rlang",
     "dplyr",
     "purrr",
-    "sodium"
+    "sodium",
+    "openxlsx"
   ))
 }
 
@@ -58,3 +59,9 @@ source(paste0(parent_dir, "/code/4_update_parameter_file.R"))
 
 # Run treescan
 source(paste0(parent_dir, "/code/5_run_treescan.R"))
+
+# Run the linelist creation
+source(paste0(parent_dir, "/code/6_create_signal_linelist.R"))
+
+# Now generate the signal report
+source(paste0(parent_dir, "/code/7_create_signal_report.R"))

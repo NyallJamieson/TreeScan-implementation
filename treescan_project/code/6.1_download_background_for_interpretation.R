@@ -1,79 +1,7 @@
-# Load required libraries
-library(Rnssp)
-library(tidyverse)
-library(lubridate)
-library(httr)
-library(jsonlite)
-library(readr)
-library(dplyr)
+# This script is to fill in this year and three previous years of data
 
-# You also have to update your out_dir to where you want the download to save
-# for example: I want to download the data to the following directory in my PC
-# C:/Users/NYALL/Documents/Trial
-# so I set my out_dir to the following:
-
-out_dir <- paste0(parent_dir, "/raw_data")
-
-# the slash must be / and not \. If you wish to use \ then it must be double: \\
-# Please update the out_dir directory to the relevant location for your download
-
-setwd(out_dir)
-
-# To do once, or when password changes - You need to put your essence username and password in
-if (isTRUE(first_time)){
-  myProfile <- create_profile()
-  save(myProfile, file = paste0(parent_dir, "/myProfile.rda"))
-}
-
-load(paste0(parent_dir, "/myProfile.rda"))
-
-do_download_historical_data <- TRUE # TRUE FALSE
-do_download_addhoc_data <- TRUE # TRUE FALSE
-
-# Helper: build DataDetails URL
-build_datadetails_url <- function(
-    start_date,
-    end_date,
-    field_list,
-    geographySystem = "hospitalregion",
-    geographies = NULL,          # NULL = no geography filter (pull all you have access to)
-    datasource = "va_hosp",
-    userId = 7410,
-    medicalGroupingSystem = "essencesyndromes",
-    timeResolution = "daily"
-) {
-  field_list_url <- paste0("&field=", paste(field_list, collapse = "&field="))
-  
-  geo_url <- ""
-  if (!is.null(geographies) && length(geographies) > 0) {
-    geo_url <- paste0("&geography=", paste(geographies, collapse = "&geography="))
-  }
-  
-  base_url <- paste0(
-    "https://essence.syndromicsurveillance.org/nssp_essence/api/dataDetails/csv?",
-    "datasource=", datasource, "&",
-    "startDate=1Jan2026&endDate=1Jan2026&",  # placeholders
-    "medicalGroupingSystem=", medicalGroupingSystem, "&",
-    "userId=", userId, "&",
-    "percentParam=noPercent&aqtTarget=DataDetails&",
-    "geographySystem=", geographySystem, "&",
-    "detector=nodetectordetector&",
-    "timeResolution=", timeResolution
-  )
-  
-  url <- paste0(base_url, field_list_url, geo_url)
-  
-  change_dates(
-    url,
-    start_date = as.character(as.Date(start_date)),
-    end_date   = as.character(as.Date(end_date))
-  )
-}
-
-download_nssp_chunked <- function(
-    end_date = Sys.Date(),
-    months_back = 16, # we set this to 16 instead of 15 so we have roughly 30 days back up incase there is a lag issue
-    refresh_days = 30,
+# Create function to get download for 3 years back
+download_nssp_chunked_background <- function(
     chunk = c("day"),
     out_dir,
     field_list = c(
@@ -113,9 +41,11 @@ download_nssp_chunked <- function(
     stop("This version is designed for daily files only. Use chunk = 'day'.")
   }
   
-  end_date <- as.Date(end_date)
-  start_date <- end_date %m-% months(months_back)
-  refresh_start <- max(start_date, end_date - (refresh_days - 1))
+  # Get start date of the script "1_...R" 16 month NSSP data download
+  # This will be the upper bound on when for this extra data gathering
+  end_date <- END_DATE %m-% months(16) - 1
+  
+  start_date <- paste0(year(Sys.Date()) - 3, "-01-01")
   
   if (!dir.exists(out_dir)) {
     dir.create(out_dir, recursive = TRUE)
@@ -140,14 +70,11 @@ download_nssp_chunked <- function(
   existing_dates <- existing_dates[!is.na(existing_dates)]
   
   # Full historical range and gap-fill dates
-  target_dates <- seq.Date(start_date, end_date, by = "day")
+  target_dates <- seq.Date(as.Date(start_date), as.Date(end_date), by = "day")
   missing_dates_full <- setdiff(target_dates, existing_dates)
   
-  # Always refresh the most recent N days, even if they already exist
-  refresh_dates_recent <- seq.Date(refresh_start, end_date, by = "day")
-  
   # First fill historical gaps, then refresh recent dates
-  dates_to_download <- c(missing_dates_full, refresh_dates_recent)
+  dates_to_download <- c(missing_dates_full)
   dates_to_download <- sort(unique(as.Date(dates_to_download, origin = "1970-01-01")))
   
   if (length(dates_to_download) == 0) {
@@ -155,14 +82,10 @@ download_nssp_chunked <- function(
     return(invisible(NULL))
   }
   
-  message(sprintf(
-    "Ensuring full coverage from %s to %s, then refreshing the most recent %d days (%s to %s).",
-    start_date, end_date, refresh_days, refresh_start, end_date
-  ))
-  
   files <- character(0)
   
   for (d in dates_to_download) {
+    print(paste0("Downloading ", as.Date(d)))
     s <- as.Date(d)
     e <- as.Date(d)
     
@@ -180,12 +103,6 @@ download_nssp_chunked <- function(
     
     out_file <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s.csv", s, e))
     files <- c(files, out_file)
-    
-    if (s >= refresh_start) {
-      message(sprintf("Refreshing %s ...", s))
-    } else {
-      message(sprintf("Downloading missing %s ...", s))
-    }
     
     api_data <- get_api_data(url, fromCSV = TRUE)
     write.csv(api_data, out_file, row.names = FALSE)
@@ -213,5 +130,5 @@ download_nssp_chunked <- function(
   invisible(list(files = files, combined = combined_path))
 }
 
-download_nssp_chunked(out_dir = out_dir)
+download_nssp_chunked_background(out_dir = out_dir)
 

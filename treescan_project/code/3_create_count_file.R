@@ -247,6 +247,18 @@ no_repeats <- study_data_long %>%
 
 study_data_long=rbind(no_repeats,tie_breaker)
 
+v2 <- study_data_long[, c("date", "key", "severity", "code")]
+names(v2) <- c("date", "key", "dispo", "code")
+
+v2$date <- as.Date(v2$date)
+v2$key <- as.character(v2$key)
+v2$dispo <- as.character(v2$dispo)
+v2$code <- gsub("\\.", "", as.character(v2$code))
+
+# force exact column order expected downstream
+v2 <- v2[, c("date", "key", "dispo", "code")]
+
+write.csv(v2, paste0(parent_dir, "/data/v2.csv"), row.names = FALSE, quote = FALSE)
 
 ### CREATE INPUT FILE
 # input file is unique visit date, codes and count of that combo
@@ -255,6 +267,7 @@ input_file=aggregate(n ~ code+severity+date, data = study_data_long[,c("date","c
 input_file$code=ifelse(nchar(input_file$code)>=4,paste0(substr(input_file$code,1,3),".",substr(input_file$code,4,nchar(input_file$code))),input_file$code)
 # add 0- and 1-
 input_file$code1=ifelse(input_file$severity=="V",paste0("0-",input_file$code),paste0("1-",input_file$code))
+
 input_file=input_file[,c("code1","date","n")]
 names(input_file)[names(input_file)=="code1"]="code"
 
