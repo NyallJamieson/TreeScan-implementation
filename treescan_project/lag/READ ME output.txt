@@ -1,0 +1,1 @@
+This file ensures that the output folder is not empty when uploading to a server
