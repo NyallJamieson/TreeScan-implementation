@@ -27,7 +27,7 @@ Nodes <- sub(".*-", "", TS_Results_today[,2])
 
 
 # For time trend we need to download some background data
-source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation_faster.R"))
+source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
 
 if (length(Nodes) > 0){
   
