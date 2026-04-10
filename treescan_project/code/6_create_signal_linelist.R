@@ -163,7 +163,7 @@ archive_deduped$age_group <- as.character(archive_deduped$age_group)
 v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag0.csv"))
 
 # Read in Results csv file (edit to match naming convention)
-TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date() - 1, "/Results_lag1_", Sys.Date() - 1, ".csv"))
+TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag1_", Sys.Date(), ".csv"))
 
 # Signal criteria
 TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
