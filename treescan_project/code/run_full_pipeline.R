@@ -65,8 +65,8 @@ if (isTRUE(first_time)){
   devtools::install_github("cdcgov/Rnssp", force = TRUE)
 }
 
-# Run the script that installs treescan
-source(paste0(parent_dir, "/code/0_install_treescan.R"))
+# Run the script that locates treescan
+source(paste0(parent_dir, "/code/0_locate_treescan.R"))
 
 # Run the script that downloads the required data
 source(paste0(parent_dir, "/code/1_download_data.R"))
