@@ -69,7 +69,7 @@ if (isTRUE(first_time)){
 source(paste0(parent_dir, "/code/0_install_treescan.R"))
 
 # Run the script that downloads the required data
-source(paste0(parent_dir, "/code/1_download_data_faster.R"))
+source(paste0(parent_dir, "/code/1_download_data.R"))
 
 # Run the script that cleans the downloaded NSSP Essence data
 source(paste0(parent_dir, "/code/2_clean_downloaded_data.R"))
