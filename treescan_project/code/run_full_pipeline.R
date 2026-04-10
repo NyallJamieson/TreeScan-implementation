@@ -15,9 +15,26 @@ first_time <- FALSE
 
 # If you're on a server, uploading treescan download unzipped automatically
 # but still needs to install!
-
 # If on server, set as true; otherwise, set as false
 server <- FALSE
+
+# Are you going to set this for batch or be more hands on?
+# There are two options for lag selection for this pipeline
+# 1) you run daily and on the first day of the month check lag curve yourself,
+# then pick the lags you want to run for in this month
+# 2) Check your lag independently of this pipeline, but run still run pipeline for
+# your chosen lags
+# Pick between 1 and 2 for your preference
+# THIS IS INITIALLY SET TO 1
+lag_choice <- 1
+
+# If you choose approach 2, then do you want to reassess lags today?
+reassess <- FALSE
+
+# Is it a new month?
+# If so then set to true.
+# Also set to true if you want to re-assess the lag situation
+new_month <- ifelse(file.exists(paste0(parent_dir, "/lag/plots/lag_curve_", format(Sys.Date(), "%Y-%m"), ".png")), FALSE, TRUE)
 
 # We need to install all required libraries, assuming you have none installed
 if (isTRUE(first_time)){
@@ -32,7 +49,11 @@ if (isTRUE(first_time)){
     "dplyr",
     "purrr",
     "sodium",
-    "openxlsx"
+    "data.table",
+    "openxlsx",
+    "MMRRweek",
+    "png",
+    "svDialogs"
   ))
 }
 
@@ -50,6 +71,48 @@ source(paste0(parent_dir, "/code/1_download_data.R"))
 
 # Run the script that cleans the downloaded NSSP Essence data
 source(paste0(parent_dir, "/code/2_clean_downloaded_data.R"))
+
+if (lag_choice == 1){
+  # Now source in the lag assessment script (fix)
+  source(paste0(parent_dir, "/code/2.1_assess_lag.R"))
+  
+  # Now set which lags the model will use
+  source(paste0(parent_dir, "/code/2.2_pick_lags.R"))
+} else {
+  # You need to pick your lags of choice
+  # You should do this by running the ... R script to assess the lag
+  if (reassess == TRUE){
+    source(paste0(parent_dir, "/code/2.3_quick_lag_check.R"))
+    # This code will produce you a plot
+    # Choose from this plot what lags you want to consider
+    # Remember: lag of 1 day means use data up until yesterday
+    # lag of 2 days means use data up until the day before yesterday, etc
+    
+    # Ask for values
+    input <- dlgInput("Look at your lag plot. Do you want to consider new lags? If so, then type below (separated by commas). Type 1 to mean you want to use data up until a day ago, etc.")$res
+    
+    # Get location of file to update initial_lags
+    script_path <- paste0(parent_dir, "/code/run_full_pipeline.R")
+    
+    # Build replacement line
+    new_line <- paste0("  initial_lags <- c(", input, ")")
+    
+    # Read script
+    lines <- readLines(script_path)
+    
+    # Replace target line
+    lines[113] <- new_line
+    
+    # Save script
+    writeLines(lines, script_path)
+    
+    eval(parse(text = new_line))
+  }
+  
+  # We will set the initial lags to be 1 and 4
+  initial_lags <- c(1, 4)
+  # This will update this accordingly after looking at the plot
+}
 
 # Create the count file
 source(paste0(parent_dir, "/code/3_create_count_file.R"))
