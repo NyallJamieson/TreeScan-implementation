@@ -1,56 +1,41 @@
 # For epiEngage: Create Signal Linelists - Ramona Lall (3/9/2026)
 
-# Read in Results csv file (edit to match naming convention)
-TS_Results_today <- read.csv(paste0(parent_dir, "/results/", END_DATE, "/Results_", END_DATE, ".csv"))
-
-# Signal criteria
-TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
-TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
-
-# Admit signals have a lower threshold
-TS_Results_today <- TS_Results_today[which((TS_Results_today$Recurrence.Interval >= 365)|(grepl("1\\-",TS_Results_today$Node.Identifier) & TS_Results_today$Recurrence.Interval>=100)),]
-
-install.packages("MMWRweek")
+# Load required libraries
+library("sf")
+library("ggplot2")
+library("dplyr")
+library("scales")
+library("dplyr")
+library("readr")
+library("lubridate")
 library("MMWRweek")
 library("stringi")
 library("lubridate")
 library("openxlsx")
 
+# Get required nodes
+
+# Read in Results csv file (edit to match naming convention)
+TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag1_", Sys.Date(), ".csv"))
+# Signal criteria
+TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
+TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
+# Admit signals have a lower threshold
+TS_Results_today <- TS_Results_today[which((TS_Results_today$Recurrence.Interval >= 365)|(grepl("1\\-",TS_Results_today$Node.Identifier) & TS_Results_today$Recurrence.Interval>=100)),]
 TS_Results_today$Node.Identifier=stri_replace_all_fixed(TS_Results_today$Node.Identifier, "\xa0", "")
+Nodes <- sub(".*-", "", TS_Results_today[,2])
 
-# Common cause (these are for the dummy nodes that link different parts of the tree)
-common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
-common_cause <- common_cause[is.na(common_cause$X4)==F,]
-
-# check if any of the signals are for dummy node and if any, add the different linked nodes to the identifier value separated by "|"
-common_cause_codes <- TS_Results_today$Node.Identifier[grepl(paste(common_cause$X2,collapse="|"),gsub("2\\-|1\\-|0\\-","",TS_Results_today$Node.Identifier))]
-if(length(common_cause_codes)>0)
-{
-  for(i in 1:length(common_cause_codes))
-  {
-    TS_Results_today$Node.Name[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)] =TS_Results_today$Node.Identifier[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)]
-    list_codes <- common_cause$X1[grepl(paste(gsub("1\\-|2\\-","",common_cause_codes[i])),common_cause$X2)]
-    TS_Results_today$Node.Identifier[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)]=paste0(c(TS_Results_today$Node.Name[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)],list_codes),collapse="|")
-  }
-}
-
-library(sf)
-library(ggplot2)
-library(dplyr)
-library(scales)
-library(dplyr)
-library(readr)
 
 # For time trend we need to download some background data
-source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
+source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation_faster.R"))
 
 # For time trend table pull in current year and additional 3 prior years
 yr_list <- (as.numeric(format(Sys.Date(),"%Y"))-3) : as.numeric(format(Sys.Date(),"%Y"))
 
 # Bit of tidying up before importing data
 files <- list.files(paste0(parent_dir, "/raw_data"),
-  pattern = "^NSSP_data_\\d{4}-\\d{2}-\\d{2}_to_\\d{4}-\\d{2}-\\d{2}\\.csv$",
-  full.names = TRUE
+                    pattern = "^NSSP_data_\\d{4}-\\d{2}-\\d{2}_to_\\d{4}-\\d{2}-\\d{2}\\.csv$",
+                    full.names = TRUE
 )
 
 # extract the first date from each filename
@@ -85,6 +70,8 @@ ed4$date <- as.Date(ed4$C_Visit_Date_Time)
 ed4 <- ed4[,c("date","Hospital","DischargeDiagnosis","DischargeDisposition")]
 
 ed <- rbind(ed1,ed2,ed3,ed4)
+
+
 
 # We have a step where we need to impute admit for a set of hospitals
 # ed <- ed %>%
@@ -184,10 +171,48 @@ archive_deduped$age_group <- cut(
 
 archive_deduped$age_group <- as.character(archive_deduped$age_group)
 
-# Load in the count file
-v2 <- read.csv(paste0(parent_dir, "/data/v2.csv"))
 
+
+
+
+
+# Load in the count file
+v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag0.csv"))
+
+# Read in Results csv file (edit to match naming convention)
+TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag1_", Sys.Date(), ".csv"))
+
+# Signal criteria
+TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
+TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
+
+# Admit signals have a lower threshold
+TS_Results_today <- TS_Results_today[which((TS_Results_today$Recurrence.Interval >= 365)|(grepl("1\\-",TS_Results_today$Node.Identifier) & TS_Results_today$Recurrence.Interval>=100)),]
+
+library("MMWRweek")
+library("stringi")
 library("lubridate")
+library("openxlsx")
+
+TS_Results_today$Node.Identifier=stri_replace_all_fixed(TS_Results_today$Node.Identifier, "\xa0", "")
+
+# Common cause (these are for the dummy nodes that link different parts of the tree)
+common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
+common_cause <- common_cause[is.na(common_cause$X4)==F,]
+
+# check if any of the signals are for dummy node and if any, add the different linked nodes to the identifier value separated by "|"
+common_cause_codes <- TS_Results_today$Node.Identifier[grepl(paste(common_cause$X2,collapse="|"),gsub("2\\-|1\\-|0\\-","",TS_Results_today$Node.Identifier))]
+if(length(common_cause_codes)>0)
+{
+  for(i in 1:length(common_cause_codes))
+  {
+    TS_Results_today$Node.Name[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)] =TS_Results_today$Node.Identifier[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)]
+    list_codes <- common_cause$X1[grepl(paste(gsub("1\\-|2\\-","",common_cause_codes[i])),common_cause$X2)]
+    TS_Results_today$Node.Identifier[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)]=paste0(c(TS_Results_today$Node.Name[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)],list_codes),collapse="|")
+  }
+}
+
+END_DATE <- Sys.Date() - LAG
 
 # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
 # This has "date", "key", "dispo", "code" (in that order)
