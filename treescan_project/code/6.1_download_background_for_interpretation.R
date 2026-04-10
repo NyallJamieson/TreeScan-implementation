@@ -1,134 +1,127 @@
-# This script is to fill in this year and three previous years of data
+# Load required libraries
+library(Rnssp)
+library(dplyr)
+library(lubridate)
+library(readr)
 
-# Create function to get download for 3 years back
-download_nssp_chunked_background <- function(
-    chunk = c("day"),
-    out_dir,
-    field_list = c(
-      "C_Unique_Patient_ID",
-      "DischargeDiagnosis",
-      "ChiefComplaintParsed",
-      "Age",
-      "C_Visit_Date_Time",
-      "C_Visit_Date_Source",
-      "C_Patient_Class",
-      "Region",
-      "Hospital",
-      "HospitalZip",
-      "Patient_Zip",
-      "DischargeDiagnosisUpdates",
-      "DischargeDiagnosisMDTUpdates",
-      "DischargeDisposition",
-      "HasBeenAdmitted",
-      "Sex",
-      "C_Race",
-      "C_Ethnicity",
-      "Admit_Reason_Code",
-      "ModeOfArrival",
-      "Travel_History",
-      "TriageNotesParsed", 
-      "Discharge_Date_Time"
-    ),
-    geographySystem = "hospitalregion",
-    geographies = NULL,
-    datasource = "va_hosp",
-    userId = 7410,
-    medicalGroupingSystem = "essencesyndromes",
-    timeResolution = "daily",
-    combine = FALSE
-) {
-  if (chunk != "day") {
-    stop("This version is designed for daily files only. Use chunk = 'day'.")
-  }
-  
-  # Get start date of the script "1_...R" 16 month NSSP data download
-  # This will be the upper bound on when for this extra data gathering
-  end_date <- END_DATE %m-% months(16) - 1
-  
-  start_date <- paste0(year(Sys.Date()) - 3, "-01-01")
-  
-  if (!dir.exists(out_dir)) {
-    dir.create(out_dir, recursive = TRUE)
-  }
-  
-  # Find existing daily files
-  existing_files <- list.files(
-    out_dir,
-    pattern = "^NSSP_data_\\d{4}-\\d{2}-\\d{2}_to_\\d{4}-\\d{2}-\\d{2}\\.csv$",
-    full.names = FALSE
-  )
-  
-  # Only treat true daily files (start == end) as completed days
-  file_dates <- regexec("^NSSP_data_(\\d{4}-\\d{2}-\\d{2})_to_(\\d{4}-\\d{2}-\\d{2})\\.csv$", existing_files)
-  file_parts <- regmatches(existing_files, file_dates)
-  
-  existing_dates <- vapply(file_parts, function(x) {
-    if (length(x) == 3 && x[2] == x[3]) x[2] else NA_character_
-  }, character(1))
-  
-  existing_dates <- as.Date(existing_dates, format = "%Y-%m-%d")
-  existing_dates <- existing_dates[!is.na(existing_dates)]
-  
-  # Full historical range and gap-fill dates
-  target_dates <- seq.Date(as.Date(start_date), as.Date(end_date), by = "day")
-  missing_dates_full <- setdiff(target_dates, existing_dates)
-  
-  # First fill historical gaps, then refresh recent dates
-  dates_to_download <- c(missing_dates_full)
-  dates_to_download <- sort(unique(as.Date(dates_to_download, origin = "1970-01-01")))
-  
-  if (length(dates_to_download) == 0) {
-    message("Your downloads are up to date")
-    return(invisible(NULL))
-  }
-  
-  files <- character(0)
-  
-  for (d in dates_to_download) {
-    print(paste0("Downloading ", as.Date(d)))
-    s <- as.Date(d)
-    e <- as.Date(d)
-    
-    url <- build_datadetails_url(
-      start_date = s,
-      end_date = e,
-      field_list = field_list,
-      geographySystem = geographySystem,
-      geographies = geographies,
-      datasource = datasource,
-      userId = userId,
-      medicalGroupingSystem = medicalGroupingSystem,
-      timeResolution = timeResolution
-    )
-    
-    out_file <- file.path(out_dir, sprintf("NSSP_data_%s_to_%s.csv", s, e))
-    files <- c(files, out_file)
-    
-    api_data <- get_api_data(url, fromCSV = TRUE)
-    write.csv(api_data, out_file, row.names = FALSE)
-  }
-  
-  if (!combine) {
-    return(invisible(files))
-  }
-  
-  message("Combining all daily files in requested range...")
-  files_to_combine <- file.path(
-    out_dir,
-    sprintf("NSSP_data_%s_to_%s.csv", target_dates, target_dates)
-  )
-  files_to_combine <- files_to_combine[file.exists(files_to_combine)]
-  
-  df <- bind_rows(lapply(files_to_combine, readr::read_csv, show_col_types = FALSE))
-  combined_path <- file.path(
-    out_dir,
-    sprintf("NSSP_data_%s_to_%s_COMBINED.csv", start_date, end_date)
-  )
-  write.csv(df, combined_path, row.names = FALSE)
-  message(sprintf("Saved combined file: %s", combined_path))
-  
-  invisible(list(files = files, combined = combined_path))
+# Where we save these files temporarily
+out_dir2 <- file.path(parent_dir, "data_for_interpretation")
+dir.create(out_dir2, recursive = TRUE, showWarnings = FALSE)
+
+# Get the data in the way ESSENCE API wants
+fmt_essence_date <- function(x) {
+  x <- as.Date(x)
+  paste0(as.integer(format(x, "%d")), format(x, "%b%Y"))
 }
 
-download_nssp_chunked_background(out_dir = out_dir)
+# Get nodes formatted correctly
+fmt_node <- function(Nodes) {
+  paste0("&dischargeDiagnosis=%5E", Nodes, "%5E", collapse = "")
+}
 
+# Get node API coding
+node_code <- fmt_node(Nodes)
+
+# This code builds the url to download the data
+build_url <- function(start_date, end_date, diagnosis_code = node) {
+  paste0(
+    "https://essence.syndromicsurveillance.org/nssp_essence/api/dataDetails/csv?",
+    "datasource=va_er",
+    "&startDate=", fmt_essence_date(start_date),
+    "&medicalGroupingSystem=essencesyndromes",
+    "&userId=8230",
+    "&endDate=", fmt_essence_date(end_date),
+    "&percentParam=noPercent",
+    "&aqtTarget=DataDetails",
+    "&geographySystem=region",
+    "&detector=probrepswitch",
+    "&timeResolution=daily",
+    node_code,
+    "&field=C_Unique_Patient_ID&field=DischargeDiagnosis&field=ChiefComplaintParsed&field=Age&field=C_Visit_Date_Time&field=C_Visit_Date_Source&field=C_Patient_Class&field=Region&field=Hospital&field=HospitalZip&field=Patient_Zip&field=DischargeDiagnosisUpdates&field=DischargeDiagnosisMDTUpdates&field=DischargeDisposition&field=HasBeenAdmitted&field=Sex&field=C_Race&field=C_Ethnicity&field=Admit_Reason_Code&field=ModeOfArrival&field=Travel_History&field=TriageNotesParsed&field=Discharge_Date_Time&field=Diagnosis_Combo&field=TriageNotesOrig&field=ChiefComplaintUpdates"
+  )
+}
+
+# This splits up the download into yearly chunks to make it manageable
+make_yearly_chunks <- function(start_date, end_date) {
+  start_date <- as.Date(start_date)
+  end_date <- as.Date(end_date)
+  
+  starts <- seq(floor_date(start_date, "year"), floor_date(end_date, "year"), by = "1 year")
+  
+  lapply(starts, function(s) {
+    s2 <- max(s, start_date)
+    e2 <- min(ceiling_date(s, "year") - days(1), end_date)
+    list(start = s2, end = e2)
+  })
+}
+
+# Now saves the data in yearly files
+write_yearly <- function(df, out_dir2) {
+  if (!"C_Visit_Date_Time" %in% names(df)) return(invisible(NULL))
+  
+  df <- df %>%
+    mutate(file_year = format(as.Date(C_Visit_Date_Time), "%Y")) %>%
+    filter(!is.na(file_year))
+  
+  if (nrow(df) == 0) return(invisible(NULL))
+  
+  split_df <- split(df, df$file_year)
+  
+  for (y in names(split_df)) {
+    readr::write_csv(
+      split_df[[y]] %>% select(-file_year),
+      file.path(out_dir2, paste0("NSSP_", y, ".csv"))
+    )
+  }
+  
+  invisible(NULL)
+}
+
+# Function to now download the data and use all above functions together
+download_nssp <- function(start_date, end_date, diagnosis_code = node, out_dir_path) {
+  chunks <- make_yearly_chunks(start_date, end_date)
+  log <- vector("list", length(chunks))
+  
+  for (i in seq_along(chunks)) {
+    s <- chunks[[i]]$start
+    e <- chunks[[i]]$end
+    url <- build_url(s, e, diagnosis_code)
+    
+    message("Chunk ", i, "/", length(chunks), ": ", s, " to ", e)
+    
+    dat <- tryCatch(
+      myProfile$get_api_data(url, fromCSV = TRUE),
+      error = function(err) NULL
+    )
+    
+    if (is.null(dat) || !is.data.frame(dat) || nrow(dat) == 0) {
+      message("  skipped")
+      log[[i]] <- data.frame(
+        start = as.character(s),
+        end = as.character(e),
+        status = "failed_or_empty",
+        rows = NA_integer_
+      )
+      next
+    }
+    
+    message("  rows: ", nrow(dat))
+    write_yearly(dat, out_dir_path)
+    
+    log[[i]] <- data.frame(
+      start = as.character(s),
+      end = as.character(e),
+      status = "ok",
+      rows = nrow(dat)
+    )
+  }
+  
+  bind_rows(log)
+}
+
+# Download the data
+res <- download_nssp(
+  start_date = as.Date("2023-01-01"),
+  end_date = Sys.Date(),
+  out_dir_path = out_dir2
+)
