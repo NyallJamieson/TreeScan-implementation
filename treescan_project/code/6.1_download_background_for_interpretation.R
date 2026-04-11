@@ -119,9 +119,28 @@ download_nssp <- function(start_date, end_date, diagnosis_code = node, out_dir_p
   bind_rows(log)
 }
 
-# Download the data
-res <- download_nssp(
-  start_date = as.Date("2023-01-01"),
-  end_date = Sys.Date(),
-  out_dir_path = out_dir2
-)
+if (length(Nodes) > 0){
+  # Download the data
+  res <- download_nssp(
+    start_date = as.Date("2023-01-01"),
+    end_date = Sys.Date(),
+    out_dir_path = out_dir2
+  )
+} else {
+  print("You have no signals")
+}
+
+# Create a regex pattern for exact matches between semicolons
+pattern <- paste0(";", paste(Nodes, collapse = ";|;"), ";")
+
+# Make sure we don't have any incorrect nodes
+for (j in list.files(out_dir2, pattern = "\\.csv$", full.names = TRUE)) {
+  print(j)
+  A <- read.csv(j)
+  
+  # Filter rows with at least one exact match
+  filtered_df <- A %>%
+    filter(str_detect(DischargeDiagnosis, pattern))
+  
+  write.csv(filtered_df, j, row.names = FALSE)
+}

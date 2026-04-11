@@ -29,7 +29,7 @@ server <- FALSE
 lag_choice <- 1
 
 # If you choose approach 2, then do you want to reassess lags today?
-reassess <- FALSE
+reassess <- TRUE
 
 # Is it a new month?
 # If so then set to true.

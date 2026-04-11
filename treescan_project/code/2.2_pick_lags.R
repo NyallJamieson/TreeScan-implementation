@@ -1,4 +1,4 @@
-# Is it a new month? (we assess lag in new month)
+initial_lags <- c(1,4)
 # Set to true if you want to change (or re-assess) the lags you're using
 initial_lags <- c(1, 4)
 
