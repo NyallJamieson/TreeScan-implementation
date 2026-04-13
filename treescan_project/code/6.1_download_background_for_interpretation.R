@@ -134,13 +134,13 @@ if (length(Nodes) > 0){
 pattern <- paste0(";", paste(Nodes, collapse = ";|;"), ";")
 
 # Make sure we don't have any incorrect nodes
-for (j in list.files(out_dir2, pattern = "\\.csv$", full.names = TRUE)) {
-  print(j)
-  A <- read.csv(j)
-  
-  # Filter rows with at least one exact match
-  filtered_df <- A %>%
-    filter(str_detect(DischargeDiagnosis, pattern))
-  
-  write.csv(filtered_df, j, row.names = FALSE)
-}
+#for (j in list.files(out_dir2, pattern = "\\.csv$", full.names = TRUE)) {
+#  print(j)
+#  A <- read.csv(j)
+#  
+#  # Filter rows with at least one exact match
+#  filtered_df <- A %>%
+#    filter(str_detect(DischargeDiagnosis, pattern))
+#  
+#  write.csv(filtered_df, j, row.names = FALSE)
+#}

@@ -192,12 +192,14 @@ for (lag in initial_lags){
       }
     }
     
-    END_DATE <- Sys.Date() - LAG
+    END_DATE <- Sys.Date() - lag
     
     # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
     # This has "date", "key", "dispo", "code" (in that order)
     for(i in 1:nrow(TS_Results_today))
     {
+      print(i)
+      
       # Cluster and Baseline Linelists using original unrestricted archive_deduped
       # temp=archive_deduped[which(grepl(paste0(gsub("\\.","",gsub("0\\-|1\\-|2\\-","",TS_Results_today$Node.Identifier[i]))),archive_deduped$diagnosiscode1)==T & archive_deduped$date>=as.Date(TS_Results_today$Time.Window.Start[i])),c("date","time","key","hospital","zipcode","patientid","sex","age","age_group","race","ethnicity","chiefcomplaint","admitreason","diagnosiscode","diagnosistext","diagnosiscode1","modeofarrival","travelhistory","dischargedisposition","dispo","dischargedate","triagenote")]
       # temp1=archive_deduped[which(grepl(paste0(gsub("\\.","",gsub("0\\-|1\\-|2\\-","",TS_Results_today$Node.Identifier[i]))),archive_deduped$diagnosiscode1)==T & archive_deduped$date<as.Date(TS_Results_today$Time.Window.Start[i])),c("date","time","key","hospital","zipcode","patientid","sex","age","age_group","race","ethnicity","chiefcomplaint","admitreason","diagnosiscode","diagnosistext","diagnosiscode1","modeofarrival","travelhistory","dischargedisposition","dispo","dischargedate","triagenote")]
@@ -292,6 +294,9 @@ for (lag in initial_lags){
           temp1$dxtype[is.na(temp1$dxtype)==T]=-1
         }
         
+        names(temp)[21] <- "dispo"
+        names(temp1)[21] <- "dispo"
+        
         # if 1- then only keep Adverse visits
         if(grepl("1\\-",TS_Results_today$Node.Identifier[i])==T)
         {temp=temp[which(temp$dispo=="A"),]
@@ -375,6 +380,8 @@ for (lag in initial_lags){
         temp1_z$pct=round(temp1_z$Freq/sum(temp1_z$Freq),4)
         names(temp1_z)[1]="modzcta"
         
+        temp_z$modzcta <- as.character(temp_z$modzcta)
+        
         modzcta1 <- left_join(modzcta, temp_z, by = "modzcta")
         
         p <- ggplot(modzcta1) +
@@ -446,11 +453,17 @@ for (lag in initial_lags){
         
         # Top cc words in Cluster and Baseline
         temp4=as.data.frame(table(toupper(unlist(lapply(strsplit(gsub(x=temp$chiefcomplaint[which(temp$dxtype!=-1)],pattern="[[:punct:]]",replacement=" "),split=" "),unique)))))
-        temp4=temp4[!temp4$Var1 %in% c("","I10","THE","A","AN","OF","AND","TO","IN","FOR","WITH","ON","IS","WAS","ARE","BY","AT","FROM","MY","HIS","HER","HE","SHE","AS","PER","I","HAS","HAVE","PT","PATIENT","STATES"),]
-        temp4=temp4[nchar(as.character(temp4$Var1))>=2,]
-        #temp4=temp4[order(-temp4$Freq),]
-        names(temp4)=c("CC_word","ClusterFreq")
-        temp4$ClusterPct=round((temp4$ClusterFreq*100)/length(temp$chiefcomplaint[which(temp$dxtype!=-1)]),1)
+        
+        BIN <- FALSE
+        
+        if (nrow(temp4) > 0){
+          BIN <- TRUE
+          temp4=temp4[!temp4$Var1 %in% c("","I10","THE","A","AN","OF","AND","TO","IN","FOR","WITH","ON","IS","WAS","ARE","BY","AT","FROM","MY","HIS","HER","HE","SHE","AS","PER","I","HAS","HAVE","PT","PATIENT","STATES"),]
+          temp4=temp4[nchar(as.character(temp4$Var1))>=2,]
+          #temp4=temp4[order(-temp4$Freq),]
+          names(temp4)=c("CC_word","ClusterFreq")
+          temp4$ClusterPct=round((temp4$ClusterFreq*100)/length(temp$chiefcomplaint[which(temp$dxtype!=-1)]),1)
+        }
         
         vals <- temp1$chiefcomplaint[which(temp1$dxtype != -1)]
         vals <- vals[!is.na(vals) & vals != ""]
@@ -488,12 +501,18 @@ for (lag in initial_lags){
           }
         }
         
-        temp_words=merge(temp4,temp4b,by="CC_word",all=TRUE)
-        temp_words=temp_words[order(-temp_words$ClusterFreq),]
+        if (BIN == TRUE){
+          temp_words=merge(temp4,temp4b,by="CC_word",all=TRUE)
+          temp_words=temp_words[order(-temp_words$ClusterFreq),]
+        }
         
         # Demographic tables for comparing Cluster and Baseline
         temp_d=temp[which(temp$dxtype!=-1),c("sex","age_group", "race","ethnicity","zipcode")]
-        temp_d$group <- "Cluster"
+        
+        if (BIN == TRUE){
+          temp_d$group <- "Cluster"
+        }
+        
         temp1_d=temp1[which(temp1$dxtype!=-1),c("sex","age_group", "race","ethnicity","zipcode")]
         temp1_d$group <- "Baseline"
         combined=rbind(temp_d,temp1_d)
@@ -640,162 +659,165 @@ for (lag in initial_lags){
         # Initialize results list
         results <- list()
         
-        for (var in demographics) {
+        if (BIN == TRUE){
           
-          # contingency table for test
-          tab <- table(combined[[var]], combined$group)
+          for (var in demographics) {
+            
+            # contingency table for test
+            tab <- table(combined[[var]], combined$group)
+            
+            # proportions by group
+            prop <- round(prop.table(tab, margin = 2) * 100, 2)
+            
+            # convert to data frame
+            combined_prop <- as.data.frame.matrix(prop)
+            combined_prop$Variable <- rownames(combined_prop)
+            rownames(combined_prop) <- NULL
+            
+            # run test once
+            test_res <- safe_test_p(tab)
+            p_val <- test_res$p.value
+            method <- test_res$method
+            
+            # add p-value and method
+            combined_prop$p_value <- ""
+            combined_prop$p_value[1] <- ifelse(is.na(p_val), "", round(p_val, 3))
+            
+            combined_prop$method <- ""
+            combined_prop$method[1] <- method
+            
+            # add variable name
+            combined_prop$Demographic <- var
+            
+            # reorder columns
+            combined_prop <- combined_prop[, c("Demographic", "Variable", "Baseline", "Cluster", "p_value", "method")]
+            
+            # store
+            results[[var]] <- combined_prop
+          }
           
-          # proportions by group
-          prop <- round(prop.table(tab, margin = 2) * 100, 2)
+          # bind all results
+          demographic_results <- do.call(rbind, results)
+          rownames(demographic_results) <- NULL
           
-          # convert to data frame
-          combined_prop <- as.data.frame.matrix(prop)
-          combined_prop$Variable <- rownames(combined_prop)
-          rownames(combined_prop) <- NULL
+          demog_table <- demographic_results
           
-          # run test once
-          test_res <- safe_test_p(tab)
-          p_val <- test_res$p.value
-          method <- test_res$method
+          demog_table <- demog_table[!demog_table$Variable %in% c("M", "NOT HISPANIC OR LATINO"), ]
+          rownames(demog_table) <- NULL
           
-          # add p-value and method
-          combined_prop$p_value <- ""
-          combined_prop$p_value[1] <- ifelse(is.na(p_val), "", round(p_val, 3))
+          demog_table$Baseline <- as.numeric(demog_table$Baseline)
+          demog_table$Cluster <- as.numeric(demog_table$Cluster)
           
-          combined_prop$method <- ""
-          combined_prop$method[1] <- method
+          demog_table$Diff <- round(demog_table$Cluster - demog_table$Baseline, 2)
           
-          # add variable name
-          combined_prop$Demographic <- var
+          demog_table=demog_table[,c("Demographic","Variable","Cluster","Baseline","Diff","p_value","method")]
+          names(demog_table)=c("Demographic","Variable","ClusterPercent","BaselinePercent","ClusterMinusBaselinePercent","ChiSq_Fis_Pval","Method")
           
-          # reorder columns
-          combined_prop <- combined_prop[, c("Demographic", "Variable", "Baseline", "Cluster", "p_value", "method")]
+          # Hospital Graph
+          hosp_c=data.frame(table(temp$hospital[which(temp$dxtype!=-1)])/nrow(temp[which(temp$dxtype!=-1),]))
+          hosp_b=data.frame(table(temp1$hospital[which(temp1$dxtype!=-1)])/nrow(temp1[which(temp1$dxtype!=-1),]))
+          names(hosp_c)=c("hospital","ClusterPct")
+          names(hosp_b)=c("hospital","BaselinePct")
+          hosp_cb=merge(hosp_c,hosp_b,by="hospital",all=TRUE)
+          hosp_cb$ClusterPct[is.na(hosp_cb$ClusterPct)==T]=0
+          hosp_cb$BaselinePct[is.na(hosp_cb$BaselinePct)==T]=0
+          hosp_cb$diff=hosp_cb$ClusterPct-hosp_cb$BaselinePct
+          hosp_cb=hosp_cb[order(-hosp_cb$diff),]
+          hosp_cb$hospital=gsub("HOSPITAL","HOSP",hosp_cb$hospital)
+          hosp_cb$hospital=gsub("MEDICAL","MED",hosp_cb$hospital)
+          hosp_cb$hospital=gsub("CENTER","CTR",hosp_cb$hospital)
+          hospital_barplot <- tempfile(fileext = ".png")
           
-          # store
-          results[[var]] <- combined_prop
+          # Increase margins to fit long labels
+          png(hospital_barplot, width = 1000, height = 600, res = 150)
+          par(mar = c(10, 4, 4, 2))  # Adjust bottom margin for label space
+          
+          barplot(hosp_cb$diff*100,ylab="%",names.arg=hosp_cb$hospital,las=2,cex.names=0.35,main="Difference in percent of ED visits by hospital between cluster and baseline periods",cex.main=0.8)
+          dev.off()
+          
+          # Create excel with tab sheets
+          wb <- createWorkbook()
+          
+          # Add data frames to sheets
+          temp$NYCres=ifelse(substr(temp$zipcode,1,5) %in% df$zipcode,"Y","N")
+          temp1$NYCres=ifelse(substr(temp1$zipcode,1,5) %in% df$zipcode,"Y","N")
+          
+          addWorksheet(wb, "ClusterLinelist")
+           writeData(wb, "ClusterLinelist", temp[,c(1:6,ncol(temp),7:16,18:(ncol(temp)-1))])
+          
+          # addWorksheet(wb, "BaselineLinelist")
+          # writeData(wb, "BaselineLinelist", temp1[,c(1:6,ncol(temp1),7:16,18:(ncol(temp1)-1))])
+          
+          addWorksheet(wb, "Other_Codes")
+          writeData(wb, "Other_Codes", temp3c[,c("Level4","Desc","ClusterFreq", "ClusterPct")], startRow = 1, startCol = 1)
+          writeData(wb, "Other_Codes", temp3b[,c("Level4","Desc","BaselineFreq", "BaselinePct")], startRow = 1, startCol = 6)
+          
+          addWorksheet(wb, "TopCC_words")
+          writeData(wb, "TopCC_words", temp_words)
+          
+          highlight_rows <- which(is.na(temp_words$BaselineFreq))[1:30]
+          
+          # Create yellow highlight style
+          yellow_style <- createStyle(fgFill = "yellow")  # Yellow
+          
+          # Apply the style to each matching row
+          for (j in highlight_rows) {
+            addStyle(
+              wb, 
+              sheet = "TopCC_words",
+              style = yellow_style,
+              rows = j + 1,  # +1 to account for header row
+              cols = 1:2,
+              gridExpand = TRUE,
+              stack = TRUE
+            )
+          }
+          
+          # Weekly trends
+          addWorksheet(wb, "Trends")
+          insertImage(wb, sheet = "Trends", file = code_trend, startRow = 1, startCol = 1, width = 10, height = 6)
+          
+        # Maps   
+          addWorksheet(wb, "Maps")
+          
+          # Insert image into worksheet
+          insertImage(wb, sheet = "Maps", file = ggsave("map.jpg", plot = p, width = 6, height = 5, dpi = 300), 
+                      startRow = 1, startCol = 1, width = 6, height = 5, units = "in")
+          
+          insertImage(wb, sheet = "Maps", file = ggsave("map1.jpg", plot = p1, width = 6, height = 5, dpi = 300), 
+                      startRow = 1, startCol = 8, width = 6, height = 5, units = "in")
+          
+          # Hospitals
+          addWorksheet(wb, "Hospitals")
+          insertImage(wb, sheet = "Hospitals", file = hospital_barplot, startRow = 1, startCol = 1, width = 10, height = 6)
+          
+          # demog table
+          addWorksheet(wb, "Demographics")
+          writeData(wb, "Demographics", demog_table)
+          
+          highlight_rows <- which(demog_table$ChiSq_Fis_Pval!="" & demog_table$ChiSq_Fis_Pval<0.05)
+          
+          # Create yellow highlight style
+          yellow_style <- createStyle(fgFill = "yellow")  # Yellow
+          
+          # Apply the style to each matching row
+          for (j in highlight_rows) {
+            addStyle(
+              wb, 
+              sheet = "Demographics",
+              style = yellow_style,
+              rows = j + 1,  # +1 to account for header row
+              cols = 6,
+              gridExpand = TRUE,
+              stack = TRUE
+            )
+          }
+          writeData(wb, "Demographics", "Missing and unknown race and ethnicity categories are excluded from chi-squared tests", startRow = nrow(demog_table) + 3, startCol = 1)
+          
+          # Save workbook: provide folder path
+          saveWorkbook(wb, paste0(parent_dir,"/signal_interpretation/", Sys.Date(), "_lag", lag, "_", gsub("\\|", "_",gsub("2\\-","",TS_Results_today$Node.Identifier[i])),".xlsx"), overwrite = TRUE)
         }
-        
-        # bind all results
-        demographic_results <- do.call(rbind, results)
-        rownames(demographic_results) <- NULL
-        
-        demog_table <- demographic_results
-        
-        demog_table <- demog_table[!demog_table$Variable %in% c("M", "NOT HISPANIC OR LATINO"), ]
-        rownames(demog_table) <- NULL
-        
-        demog_table$Baseline <- as.numeric(demog_table$Baseline)
-        demog_table$Cluster <- as.numeric(demog_table$Cluster)
-        
-        demog_table$Diff <- round(demog_table$Cluster - demog_table$Baseline, 2)
-        
-        demog_table=demog_table[,c("Demographic","Variable","Cluster","Baseline","Diff","p_value","method")]
-        names(demog_table)=c("Demographic","Variable","ClusterPercent","BaselinePercent","ClusterMinusBaselinePercent","ChiSq_Fis_Pval","Method")
-        
-        # Hospital Graph
-        hosp_c=data.frame(table(temp$hospital[which(temp$dxtype!=-1)])/nrow(temp[which(temp$dxtype!=-1),]))
-        hosp_b=data.frame(table(temp1$hospital[which(temp1$dxtype!=-1)])/nrow(temp1[which(temp1$dxtype!=-1),]))
-        names(hosp_c)=c("hospital","ClusterPct")
-        names(hosp_b)=c("hospital","BaselinePct")
-        hosp_cb=merge(hosp_c,hosp_b,by="hospital",all=TRUE)
-        hosp_cb$ClusterPct[is.na(hosp_cb$ClusterPct)==T]=0
-        hosp_cb$BaselinePct[is.na(hosp_cb$BaselinePct)==T]=0
-        hosp_cb$diff=hosp_cb$ClusterPct-hosp_cb$BaselinePct
-        hosp_cb=hosp_cb[order(-hosp_cb$diff),]
-        hosp_cb$hospital=gsub("HOSPITAL","HOSP",hosp_cb$hospital)
-        hosp_cb$hospital=gsub("MEDICAL","MED",hosp_cb$hospital)
-        hosp_cb$hospital=gsub("CENTER","CTR",hosp_cb$hospital)
-        hospital_barplot <- tempfile(fileext = ".png")
-        
-        # Increase margins to fit long labels
-        png(hospital_barplot, width = 1000, height = 600, res = 150)
-        par(mar = c(10, 4, 4, 2))  # Adjust bottom margin for label space
-        
-        barplot(hosp_cb$diff*100,ylab="%",names.arg=hosp_cb$hospital,las=2,cex.names=0.35,main="Difference in percent of ED visits by hospital between cluster and baseline periods",cex.main=0.8)
-        dev.off()
-        
-        # Create excel with tab sheets
-        wb <- createWorkbook()
-        
-        # Add data frames to sheets
-        temp$NYCres=ifelse(substr(temp$zipcode,1,5) %in% df$zipcode,"Y","N")
-        temp1$NYCres=ifelse(substr(temp1$zipcode,1,5) %in% df$zipcode,"Y","N")
-        
-        addWorksheet(wb, "ClusterLinelist")
-         writeData(wb, "ClusterLinelist", temp[,c(1:6,ncol(temp),7:16,18:(ncol(temp)-1))])
-        
-        addWorksheet(wb, "BaselineLinelist")
-        writeData(wb, "BaselineLinelist", temp1[,c(1:6,ncol(temp1),7:16,18:(ncol(temp1)-1))])
-        
-        addWorksheet(wb, "Other_Codes")
-        writeData(wb, "Other_Codes", temp3c[,c("Level4","Desc","ClusterFreq", "ClusterPct")], startRow = 1, startCol = 1)
-        writeData(wb, "Other_Codes", temp3b[,c("Level4","Desc","BaselineFreq", "BaselinePct")], startRow = 1, startCol = 6)
-        
-        addWorksheet(wb, "TopCC_words")
-        writeData(wb, "TopCC_words", temp_words)
-        
-        highlight_rows <- which(is.na(temp_words$BaselineFreq))[1:30]
-        
-        # Create yellow highlight style
-        yellow_style <- createStyle(fgFill = "yellow")  # Yellow
-        
-        # Apply the style to each matching row
-        for (j in highlight_rows) {
-          addStyle(
-            wb, 
-            sheet = "TopCC_words",
-            style = yellow_style,
-            rows = j + 1,  # +1 to account for header row
-            cols = 1:2,
-            gridExpand = TRUE,
-            stack = TRUE
-          )
-        }
-        
-        # Weekly trends
-        addWorksheet(wb, "Trends")
-        insertImage(wb, sheet = "Trends", file = code_trend, startRow = 1, startCol = 1, width = 10, height = 6)
-        
-      # Maps   
-        addWorksheet(wb, "Maps")
-        
-        # Insert image into worksheet
-        insertImage(wb, sheet = "Maps", file = ggsave("map.jpg", plot = p, width = 6, height = 5, dpi = 300), 
-                    startRow = 1, startCol = 1, width = 6, height = 5, units = "in")
-        
-        insertImage(wb, sheet = "Maps", file = ggsave("map1.jpg", plot = p1, width = 6, height = 5, dpi = 300), 
-                    startRow = 1, startCol = 8, width = 6, height = 5, units = "in")
-        
-        # Hospitals
-        addWorksheet(wb, "Hospitals")
-        insertImage(wb, sheet = "Hospitals", file = hospital_barplot, startRow = 1, startCol = 1, width = 10, height = 6)
-        
-        # demog table
-        addWorksheet(wb, "Demographics")
-        writeData(wb, "Demographics", demog_table)
-        
-        highlight_rows <- which(demog_table$ChiSq_Fis_Pval!="" & demog_table$ChiSq_Fis_Pval<0.05)
-        
-        # Create yellow highlight style
-        yellow_style <- createStyle(fgFill = "yellow")  # Yellow
-        
-        # Apply the style to each matching row
-        for (j in highlight_rows) {
-          addStyle(
-            wb, 
-            sheet = "Demographics",
-            style = yellow_style,
-            rows = j + 1,  # +1 to account for header row
-            cols = 6,
-            gridExpand = TRUE,
-            stack = TRUE
-          )
-        }
-        writeData(wb, "Demographics", "Missing and unknown race and ethnicity categories are excluded from chi-squared tests", startRow = nrow(demog_table) + 3, startCol = 1)
-        
-        # Save workbook: provide folder path
-        saveWorkbook(wb, paste0(parent_dir,"/signal_interpretation/", END_DATE, "_", gsub("\\|", "_",gsub("2\\-","",TS_Results_today$Node.Identifier[i])),".xlsx"), overwrite = TRUE)
-          }  
+      }  
       
       # If baseline is empty
       if(nrow(temp1)==0)

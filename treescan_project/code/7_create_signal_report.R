@@ -7,14 +7,14 @@ library(purrr)
 library(stringr)
 library(tidyr)
 
-if (length(Nodes >0)){
+if (length(Nodes > 0)){
   
   # Loop over lags
   for (lag in initial_lags){
     print(paste0("We are now assessing lag ", lag))
     
     # Read in Results csv file (edit to match naming convention)
-    TS_Results_today <- read.csv(paste0(parent_dir, "/results/", END_DATE, "/Results_lag", lag, "_", END_DATE, ".csv"))
+    TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag", lag, "_", Sys.Date(), ".csv"))
     
     # Signal criteria
     TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
@@ -59,7 +59,7 @@ if (length(Nodes >0)){
     # -----------------------------
     # 2) Only pull prior 7 days
     # -----------------------------
-    lookback_dates <- seq(as.Date(END_DATE) - 7, as.Date(END_DATE) - 1, by = "day")
+    lookback_dates <- seq(as.Date(Sys.Date()) - 7, as.Date(Sys.Date()) - 1, by = "day")
     lookback_str <- format(lookback_dates, "%Y-%m-%d")
     
     results_dir <- file.path(parent_dir, "results")
@@ -448,7 +448,7 @@ if (length(Nodes >0)){
   # -----------------------------
   # 8) Save
   # -----------------------------
-  out_file <- file.path(parent_dir, "signal_report", paste0("Signals_Report_", END_DATE, ".xlsx"))
+  out_file <- file.path(parent_dir, "signal_report", paste0("Signals_Report_", Sys.Date(), ".xlsx"))
   saveWorkbook(wb, out_file, overwrite = TRUE)
   
   message("Workbook saved to: ", out_file)
