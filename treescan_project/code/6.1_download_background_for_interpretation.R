@@ -15,15 +15,16 @@ fmt_essence_date <- function(x) {
 }
 
 # Get nodes formatted correctly
-fmt_node <- function(Nodes) {
-  paste0("&dischargeDiagnosis=%5E", Nodes, "%5E", collapse = "")
+fmt_node <- function(Nodes, op = "AND") {
+  expr <- paste0("%5E", Nodes, "%5E", collapse = paste0(",", op, ","))
+  paste0("&dischargeDiagnosis=", expr)
 }
 
 # Get node API coding
 node_code <- fmt_node(Nodes)
 
 # This code builds the url to download the data
-build_url <- function(start_date, end_date, diagnosis_code = node) {
+build_url <- function(start_date, end_date, diagnosis_code = node_code) {
   paste0(
     "https://essence.syndromicsurveillance.org/nssp_essence/api/dataDetails/csv?",
     "datasource=va_er",
@@ -78,7 +79,7 @@ write_yearly <- function(df, out_dir2) {
 }
 
 # Function to now download the data and use all above functions together
-download_nssp <- function(start_date, end_date, diagnosis_code = node, out_dir_path) {
+download_nssp <- function(start_date, end_date, diagnosis_code = node_code, out_dir_path) {
   chunks <- make_yearly_chunks(start_date, end_date)
   log <- vector("list", length(chunks))
   
