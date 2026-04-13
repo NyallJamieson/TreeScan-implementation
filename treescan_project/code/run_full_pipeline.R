@@ -103,7 +103,7 @@ if (lag_choice == 1){
     lines <- readLines(script_path)
     
     # Replace target line
-    lines[113] <- new_line
+    lines[115] <- new_line
     
     # Save script
     writeLines(lines, script_path)
