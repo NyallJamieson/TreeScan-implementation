@@ -10,7 +10,7 @@ path <- paste0(parent_dir, "/raw_data")
 files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
 
 # Dates we want to get cleaned
-dates_16m <- seq.Date(Sys.Date() - 1, Sys.Date() %m-% months(16))
+dates_16m <- seq.Date(to = Sys.Date() - 1, from = Sys.Date() %m-% months(16), by = "day")
 
 # Now get corresponding files
 files_from_dates <- file.path(
