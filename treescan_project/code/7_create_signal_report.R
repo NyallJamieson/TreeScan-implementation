@@ -64,10 +64,19 @@ if (length(Nodes > 0)){
     
     results_dir <- file.path(parent_dir, "results")
     
-    old_reports <- file.path(
-      results_dir,
-      lookback_str,
-      paste0("Results_", lookback_str, ".csv")
+    # Create full paths to each date directory
+    date_dirs <- file.path(results_dir, lookback_dates)
+    
+    # List all CSV files within those directories
+    old_reports <- unlist(
+      lapply(date_dirs, function(dir) {
+        list.files(
+          path = dir,
+          pattern = "\\.csv$",
+          full.names = TRUE,
+          ignore.case = TRUE
+        )
+      })
     )
     
     old_reports <- old_reports[file.exists(old_reports)]
@@ -100,15 +109,15 @@ if (length(Nodes > 0)){
       
       if (!all(c("Node.Identifier", "Time.Window.End", "Recurrence.Interval", "Relative.Risk") %in% names(temp))) next
       
-      file_dt <- as.Date(sub("^Results_(\\d{4}-\\d{2}-\\d{2})\\.csv$", "\\1", basename(file)))
+      file_dt <- sub(".*?(\\d{4}-\\d{2}-\\d{2}).*", "\\1", file)
       
-      names(temp)[names(temp) == "Recurrence.Interval"] <- paste0("RI_", format(file_dt, "%Y%m%d"))
-      names(temp)[names(temp) == "Relative.Risk"] <- paste0("RR_", format(file_dt, "%Y%m%d"))
+      names(temp)[names(temp) == "Recurrence.Interval"] <- paste0("RI_", format(as.Date(file_dt), "%Y%m%d"))
+      names(temp)[names(temp) == "Relative.Risk"] <- paste0("RR_", format(as.Date(file_dt), "%Y%m%d"))
       
       temp <- temp[, c(
         "Node.Identifier",
-        paste0("RI_", format(file_dt, "%Y%m%d")),
-        paste0("RR_", format(file_dt, "%Y%m%d"))
+        paste0("RI_", format(as.Date(file_dt), "%Y%m%d")),
+        paste0("RR_", format(as.Date(file_dt), "%Y%m%d"))
       ), drop = FALSE]
       
       temp <- temp[!duplicated(temp$Node.Identifier), , drop = FALSE]
@@ -256,19 +265,25 @@ if (length(Nodes > 0)){
   })
   
   # For each Node.Identifier, keep the row from the smallest lag
+  # base_rows <- all_data %>%
+  #   group_by(Node.Identifier) %>%
+  #   arrange(lag, .by_group = TRUE) %>%
+  #   slice(1) %>%
+  #   ungroup() %>%
+  #   select(
+  #     Trend,
+  #     Node.Identifier,
+  #     Node.Name,
+  #     Recurrence.Interval,
+  #     Relative.Risk,
+  #     lag
+  #   )
+  
   base_rows <- all_data %>%
     group_by(Node.Identifier) %>%
     arrange(lag, .by_group = TRUE) %>%
     slice(1) %>%
-    ungroup() %>%
-    select(
-      Trend,
-      Node.Identifier,
-      Node.Name,
-      Recurrence.Interval,
-      Relative.Risk,
-      lag
-    )
+    ungroup()
   
   # Build YES/NO presence columns for each lag
   presence_wide <- all_data %>%
