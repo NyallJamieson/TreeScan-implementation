@@ -103,16 +103,17 @@ if (lag_choice == 1){
     lines <- readLines(script_path)
     
     # Replace target line
-    lines[115] <- new_line
+    lines[114] <- new_line
     
     # Save script
     writeLines(lines, script_path)
     
     eval(parse(text = new_line))
+
+    # We will set the initial lags to be 1 and 4
+    initial_lags <- c(1, 4)
   }
   
-  # We will set the initial lags to be 1 and 4
-  initial_lags <- c(1, 4)
   # This will update this accordingly after looking at the plot
 }
 
