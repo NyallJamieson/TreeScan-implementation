@@ -7,6 +7,8 @@ library(purrr)
 library(stringr)
 library(tidyr)
 
+delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
+
 if (length(Nodes > 0)){
   
   # Loop over lags
@@ -38,7 +40,7 @@ if (length(Nodes > 0)){
         TS_Results_today$Node.Identifier[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)]=paste0(c(TS_Results_today$Node.Name[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)],list_codes),collapse="|")
       }
     }
-  
+    
     # For time trend we need to download some background data
     Nodes <- TS_Results_today$Node.Identifier.after_dash <- sub(".*-", "", TS_Results_today$Node.Identifier)
     
