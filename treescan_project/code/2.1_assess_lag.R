@@ -252,6 +252,10 @@ if (!isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)
     by = .(code = code_for_lag)
   ]
   
+  # Create directory to store delay by code
+  dir.create(paste0(parent_dir, "/data_by_code"))
+  saveRDS(delay_by_code, "data_by_code.rds")
+  
   # Overall delay
   overall_delay <- first_appearance[
     ,
