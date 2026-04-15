@@ -514,7 +514,11 @@ for (lag in initial_lags){
         }
         
         temp1_d=temp1[which(temp1$dxtype!=-1),c("sex","age_group", "race","ethnicity","zipcode")]
-        temp1_d$group <- "Baseline"
+        
+        # IF NO ROWS THEN THAT MEANS IS NO NON-INCIDENT IN CLUSTER
+        if (nrow(temp1_d > 0)){
+          temp1_d$group <- "Baseline"
+        }
         combined=rbind(temp_d,temp1_d)
         age_levels <- c("<1","1-4", "5-12", "13-17", "18-49", "50-64", "65-79", "80+")
         combined$age_group<- factor(combined$age_group, levels = age_levels)
@@ -538,7 +542,9 @@ for (lag in initial_lags){
         
         combined$zip3 <- factor(combined$zip3)
         ref_zip3 <- levels(combined$zip3)[1]
-        combined$zip3 <- relevel(combined$zip3, ref = ref_zip3)
+        if (nrow(combined) > 0){
+          combined$zip3 <- relevel(combined$zip3, ref = ref_zip3)
+        }
         
         # List of demographic variables
         demographics <- c("sex", "age_group", "ethnicity", "race", "zip3")
