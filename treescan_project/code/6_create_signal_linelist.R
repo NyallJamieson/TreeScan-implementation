@@ -18,7 +18,7 @@ for (lag in initial_lags){
   # Get required nodes
 
   # Read in Results csv file (edit to match naming convention)
-  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag", lag, "_", Sys.Date(), ".csv"))
+  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date()-1, "/Results_lag", lag, "_", Sys.Date()-1, ".csv"))
   # Signal criteria
   TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
   TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
@@ -27,6 +27,9 @@ for (lag in initial_lags){
   TS_Results_today$Node.Identifier=stri_replace_all_fixed(TS_Results_today$Node.Identifier, "\xa0", "")
   Nodes <- sub(".*-", "", TS_Results_today[,2])
 
+  # Reload just in case
+  load(file.path(parent_dir, "myProfile.rda"))
+  
   # For time trend we need to download some background data
   source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
 
@@ -174,7 +177,7 @@ for (lag in initial_lags){
     
     
     # Load in the count file
-    v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag", lag, ".csv"))
+    v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date()-1, "/lag", lag, ".csv"))
     
     # Common cause (these are for the dummy nodes that link different parts of the tree)
     common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
@@ -192,7 +195,7 @@ for (lag in initial_lags){
       }
     }
     
-    END_DATE <- Sys.Date() - lag
+    END_DATE <- Sys.Date()-1 - lag
     
     # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
     # This has "date", "key", "dispo", "code" (in that order)
