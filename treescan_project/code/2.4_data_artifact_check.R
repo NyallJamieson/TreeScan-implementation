@@ -1,9 +1,14 @@
 # Load back in the delay curve by code
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
 
+monthly_lags_assessed2 <- list.files(
+  paste0(parent_dir, "/lag/curves"),
+  pattern = "\\.rds$"
+)
+
 # Try get in overall curve
 curve <- readRDS(
-  paste0(parent_dir, "/lag/curves/", monthly_lags_assessed[length(monthly_lags_assessed)])
+  paste0(parent_dir, "/lag/curves/", monthly_lags_assessed2[length(monthly_lags_assessed2)])
 )
 
 library(dplyr)
