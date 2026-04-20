@@ -118,7 +118,7 @@ if (lag_choice == 1){
 }
 
 # Now get metrics on whether a code is a data artifact
-source(paste0(parent_dir, "/code/2.4/data_artifact_check.R"))
+source(paste0(parent_dir, "/code/2.4_data_artifact_check.R"))
 
 # Create the count file
 source(paste0(parent_dir, "/code/3_create_count_file.R"))
