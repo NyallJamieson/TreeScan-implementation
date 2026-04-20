@@ -8,8 +8,9 @@ library(stringr)
 library(tidyr)
 
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
+artifact_scores <- readRDS(paste0(parent_dir, "/data_artifact_assessment/artifact_scores.rds"))
 
-if (length(Nodes > 0)){
+if (length(valid_nodes > 0)){
   
   # Loop over lags
   for (lag in initial_lags){
@@ -40,7 +41,7 @@ if (length(Nodes > 0)){
         TS_Results_today$Node.Identifier[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)]=paste0(c(TS_Results_today$Node.Name[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)],list_codes),collapse="|")
       }
     }
-    
+  
     # For time trend we need to download some background data
     Nodes <- TS_Results_today$Node.Identifier.after_dash <- sub(".*-", "", TS_Results_today$Node.Identifier)
     
@@ -300,16 +301,59 @@ if (length(Nodes > 0)){
   
   # Add data artifact warning:
   # YES if present in lag 1 and absent from all other lags
+  # artifact_flag <- all_data %>%
+  #   distinct(Node.Identifier, lag) %>%
+  #   group_by(Node.Identifier) %>%
+  #   summarise(
+  #     in_lag1 = any(lag == 1),
+  #     in_other_lags = any(lag != 1),
+  #     `Data artifact warning` = if_else(in_lag1 & !in_other_lags, "YES", "NO"),
+  #     .groups = "drop"
+  #   ) %>%
+  #   select(Node.Identifier, `Data artifact warning`)
+  
+  positive_threshold <- 0.10
+  negative_threshold <- -0.10
+  
   artifact_flag <- all_data %>%
     distinct(Node.Identifier, lag) %>%
     group_by(Node.Identifier) %>%
     summarise(
       in_lag1 = any(lag == 1),
       in_other_lags = any(lag != 1),
-      `Data artifact warning` = if_else(in_lag1 & !in_other_lags, "YES", "NO"),
       .groups = "drop"
     ) %>%
-    select(Node.Identifier, `Data artifact warning`)
+    mutate(
+      code = sub("^[0-9]+-", "", Node.Identifier)
+    ) %>%
+    left_join(
+      artifact_scores %>%
+        select(code, artifact_score),
+      by = "code"
+    ) %>%
+    mutate(
+      `Data artifact warning` = if_else(
+        !is.na(artifact_score) &
+          artifact_score >= positive_threshold &
+          in_lag1,
+        "YES",
+        "NO"
+      ),
+      `Masked in lag 1 warning` = if_else(
+        !is.na(artifact_score) &
+          artifact_score <= negative_threshold &
+          !in_lag1 &
+          in_other_lags,
+        "YES",
+        "NO"
+      )
+    ) %>%
+    select(
+      Node.Identifier,
+      artifact_score,
+      `Data artifact warning`,
+      `Masked in lag 1 warning`
+    )
   
   # Final output
   final_result <- base_rows %>%
