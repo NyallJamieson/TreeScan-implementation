@@ -18,7 +18,7 @@ for (lag in initial_lags){
   # Get required nodes
   
   # Read in Results csv file (edit to match naming convention)
-  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", "Sys.Date()", "/Results_lag", lag, "_", "Sys.Date()", ".csv"))
+  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag", lag, "_", Sys.Date(), ".csv"))
   # Signal criteria
   TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
   TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
@@ -177,7 +177,7 @@ for (lag in initial_lags){
     
     
     # Load in the count file
-    v2 <- read.csv(paste0(parent_dir, "/data/v2/", "Sys.Date()", "/lag", lag, ".csv"))
+    v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag", lag, ".csv"))
     
     # Common cause (these are for the dummy nodes that link different parts of the tree)
     common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
