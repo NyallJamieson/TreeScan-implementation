@@ -18,7 +18,10 @@ monthly_lags_assessed <- list.files(
   pattern = "\\.rds$"
 )
 
-if (!isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)){
+have_we_got_lag <- isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)
+have_we_got_databycode <- isTRUE(length(list.files(paste0(parent_dir, "/data_by_code"))) > 0)
+
+if (!(isTRUE(have_we_got_lag) && isTRUE(have_we_got_databycode))){
   
   new_month <- TRUE
   
