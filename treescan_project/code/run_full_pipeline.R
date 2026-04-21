@@ -91,7 +91,7 @@ if (lag_choice == 1){
     # lag of 2 days means use data up until the day before yesterday, etc
     
     # Ask for values
-    input <- dlgInput("Look at your lag plot. Do you want to consider new lags? If so, then type below (separated by commas). Type 1 to mean you want to use data up until a day ago, etc.")$res
+    input <- svDialogs::dlgInput("Look at your lag plot. Do you want to consider new lags? If so, then type below (separated by commas). Type 1 to mean you want to use data up until a day ago, etc.")$res
     
     # Get location of file to update initial_lags
     script_path <- paste0(parent_dir, "/code/run_full_pipeline.R")
