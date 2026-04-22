@@ -73,6 +73,9 @@ monthly_lags_assessed <- list.files(
   pattern = "\\.rds$"
 )
 
+have_we_got_lag <- isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)
+have_we_got_dataforlag <- isTRUE(length(list.files(paste0(parent_dir, "/data/data for lag"))) > 0)
+
 # Now create the lag data if today is the day we do lag assessment
 if (!isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)){
   
