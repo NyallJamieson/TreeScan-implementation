@@ -77,7 +77,7 @@ have_we_got_lag <- isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_
 have_we_got_dataforlag <- isTRUE(length(list.files(paste0(parent_dir, "/data/data for lag"))) > 0)
 
 # Now create the lag data if today is the day we do lag assessment
-if (!isTRUE(paste0("lag_curve_", year_month, ".rds") %in% monthly_lags_assessed)){
+if (!(isTRUE(have_we_got_lag) && isTRUE(have_we_got_dataforlag))){
   
   dir.create(paste0(parent_dir, "/data/data for lag"), recursive = TRUE, showWarnings = FALSE)
   
