@@ -13,12 +13,38 @@ library("stringi")
 library("lubridate")
 library("openxlsx")
 
+# Helper functions for if we get bad characters
+normalize_text_utf8 <- function(x) {
+  x <- as.character(x)
+  
+  # First pass: mark declared encoding as UTF-8 where possible
+  x1 <- stringi::stri_enc_toutf8(x, is_unknown_8bit = TRUE, validate = TRUE)
+  
+  # Second pass: for anything still invalid, try common legacy encodings
+  bad <- !is.na(x1) & !stringi::stri_enc_isutf8(x1)
+  if (any(bad)) {
+    x1[bad] <- iconv(x[bad], from = "latin1", to = "UTF-8", sub = "byte")
+  }
+  
+  # Final cleanup: guarantee valid UTF-8 strings
+  x1 <- iconv(x1, from = "", to = "UTF-8", sub = "byte")
+  x1
+}
+
+normalize_for_tokens <- function(x) {
+  x <- normalize_text_utf8(x)
+  x <- stringi::stri_trans_general(x, "Latin-ASCII")
+  x <- gsub("[[:punct:]]", " ", x, perl = TRUE)
+  x <- toupper(x)
+  x
+}
+
 for (lag in initial_lags){
   
   # Get required nodes
   
   # Read in Results csv file (edit to match naming convention)
-  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag", lag, "_", Sys.Date(), ".csv"))
+  TS_Results_today <- read.csv(paste0(parent_dir, "/results/", "2020-03-14", "/Results_lag", lag, "_", "2020-03-14", ".csv"))
   # Signal criteria
   TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
   TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
@@ -36,7 +62,7 @@ for (lag in initial_lags){
   if (length(Nodes) > 0){
     
     # For time trend table pull in current year and additional 3 prior years
-    yr_list <- (as.numeric(format(Sys.Date(),"%Y"))-3) : as.numeric(format(Sys.Date(),"%Y"))
+    yr_list <- (as.numeric(format("2020-03-14","%Y"))-3) : as.numeric(format("2020-03-14","%Y"))
     
     # Bit of tidying up before importing data
     files <- list.files(paste0(parent_dir, "/data_for_interpretation"),
@@ -70,8 +96,6 @@ for (lag in initial_lags){
     ed4 <- ed4[,c("date","Hospital","DischargeDiagnosis","DischargeDisposition")]
     
     ed <- rbind(ed1,ed2,ed3,ed4)
-    
-    
     
     # We have a step where we need to impute admit for a set of hospitals
     # ed <- ed %>%
@@ -141,6 +165,12 @@ for (lag in initial_lags){
       as.POSIXct(archive_deduped$C_Visit_Date_Time, tz = "UTC"),
       "%H:%M:%S"
     )
+    
+    archive_deduped$chiefcomplaint <- normalize_text_utf8(archive_deduped$ChiefComplaintParsed)
+    archive_deduped$triagenote <- normalize_text_utf8(archive_deduped$TriageNotesOrig)
+    archive_deduped$diagnosistext <- normalize_text_utf8(archive_deduped$Diagnosis_Combo)
+    archive_deduped$admitreason <- normalize_text_utf8(archive_deduped$Admit_Reason_Code)
+    
     archive_deduped$key <- archive_deduped$C_Unique_Patient_ID
     archive_deduped$hospital <- archive_deduped$Hospital
     archive_deduped$zipcode <- archive_deduped$HospitalZip
@@ -148,16 +178,16 @@ for (lag in initial_lags){
     archive_deduped$sex <- archive_deduped$Sex
     archive_deduped$race <- archive_deduped$C_Race
     archive_deduped$ethnicity <- archive_deduped$C_Ethnicity
-    archive_deduped$chiefcomplaint <- archive_deduped$ChiefComplaintParsed
-    archive_deduped$admitreason <- archive_deduped$Admit_Reason_Code
+    # archive_deduped$chiefcomplaint <- archive_deduped$ChiefComplaintParsed
+    # archive_deduped$admitreason <- archive_deduped$Admit_Reason_Code
     archive_deduped$diagnosiscode <- archive_deduped$DischargeDiagnosis
     archive_deduped$diagnosiscode1 <- archive_deduped$diagnosiscode
-    archive_deduped$diagnosistext <- archive_deduped$Diagnosis_Combo
+    # archive_deduped$diagnosistext <- archive_deduped$Diagnosis_Combo
     archive_deduped$dischargedisposition <- archive_deduped$DischargeDisposition
     archive_deduped$dispo <- ed$dispo
     archive_deduped$modeofarrival <- archive_deduped$ModeOfArrival
     archive_deduped$travelhistory <- archive_deduped$Travel_History
-    archive_deduped$triagenote <- archive_deduped$TriageNotesOrig
+    # archive_deduped$triagenote <- archive_deduped$TriageNotesOrig
     archive_deduped$age <- archive_deduped$Age                                                                                                                            
     archive_deduped$dischargedate <- archive_deduped$Discharge_Date_Time
     
@@ -177,7 +207,7 @@ for (lag in initial_lags){
     
     
     # Load in the count file
-    v2 <- read.csv(paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag", lag, ".csv"))
+    v2 <- read.csv(paste0(parent_dir, "/data/v2/", "2020-03-14", "/lag", lag, ".csv"))
     
     # Common cause (these are for the dummy nodes that link different parts of the tree)
     common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
@@ -210,7 +240,7 @@ for (lag in initial_lags){
       }
     }
     
-    END_DATE <- Sys.Date()-1 - lag
+    END_DATE <- "2020-03-14"-1 - lag
     
     # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
     # This has "date", "key", "dispo", "code" (in that order)
@@ -709,45 +739,45 @@ for (lag in initial_lags){
           )
         }
         
-        vals_cluster <- temp$chiefcomplaint[temp$dxtype != -1]
-        if (length(vals_cluster) == 0) vals_cluster <- temp$chiefcomplaint
-        vals_cluster <- vals_cluster[!is.na(vals_cluster) & trimws(vals_cluster) != ""]
+      #   vals_cluster <- temp$chiefcomplaint[temp$dxtype != -1]
+      #   if (length(vals_cluster) == 0) vals_cluster <- temp$chiefcomplaint
+      #   vals_cluster <- vals_cluster[!is.na(vals_cluster) & trimws(vals_cluster) != ""]
         
-        if (length(vals_cluster) == 0) {
-          temp4 <- data.frame(
-            CC_word = character(),
-            ClusterFreq = integer(),
-            ClusterPct = numeric(),
-            stringsAsFactors = FALSE
-          )
-        } else {
-          words_cluster <- toupper(unlist(lapply(
-            strsplit(gsub("[[:punct:]]", " ", vals_cluster), " "),
-            unique
-          )))
+      #   if (length(vals_cluster) == 0) {
+        #   temp4 <- data.frame(
+        #     CC_word = character(),
+        #     ClusterFreq = integer(),
+        #     ClusterPct = numeric(),
+        #     stringsAsFactors = FALSE
+        #   )
+      #   } else {
+        #   words_cluster <- toupper(unlist(lapply(
+        #     strsplit(gsub("[[:punct:]]", " ", vals_cluster), " "),
+        #     unique
+        #   )))
           
-          words_cluster <- trimws(words_cluster)
-          words_cluster <- words_cluster[!is.na(words_cluster) & words_cluster != ""]
-          words_cluster <- words_cluster[!words_cluster %in% c(
-            "", "I10", "THE", "A", "AN", "OF", "AND", "TO", "IN", "FOR", "WITH",
-            "ON", "IS", "WAS", "ARE", "BY", "AT", "FROM", "MY", "HIS", "HER",
-            "HE", "SHE", "AS", "PER", "I", "HAS", "HAVE", "PT", "PATIENT", "STATES"
-          )]
-          words_cluster <- words_cluster[nchar(words_cluster) >= 2]
+        #   words_cluster <- trimws(words_cluster)
+        #   words_cluster <- words_cluster[!is.na(words_cluster) & words_cluster != ""]
+        #   words_cluster <- words_cluster[!words_cluster %in% c(
+        #     "", "I10", "THE", "A", "AN", "OF", "AND", "TO", "IN", "FOR", "WITH",
+        #     "ON", "IS", "WAS", "ARE", "BY", "AT", "FROM", "MY", "HIS", "HER",
+        #     "HE", "SHE", "AS", "PER", "I", "HAS", "HAVE", "PT", "PATIENT", "STATES"
+        #   )]
+        #   words_cluster <- words_cluster[nchar(words_cluster) >= 2]
           
-          if (length(words_cluster) == 0) {
-            temp4 <- data.frame(
-              CC_word = character(),
-              ClusterFreq = integer(),
-              ClusterPct = numeric(),
-              stringsAsFactors = FALSE
-            )
-          } else {
-            temp4 <- as.data.frame(table(words_cluster), stringsAsFactors = FALSE)
-            names(temp4) <- c("CC_word", "ClusterFreq")
-            temp4$ClusterPct <- round((temp4$ClusterFreq * 100) / length(vals_cluster), 1)
-          }
-        }
+        #   if (length(words_cluster) == 0) {
+        #     temp4 <- data.frame(
+        #       CC_word = character(),
+        #       ClusterFreq = integer(),
+        #       ClusterPct = numeric(),
+        #       stringsAsFactors = FALSE
+        #     )
+        #   } else {
+        #     temp4 <- as.data.frame(table(words_cluster), stringsAsFactors = FALSE)
+        #     names(temp4) <- c("CC_word", "ClusterFreq")
+        #     temp4$ClusterPct <- round((temp4$ClusterFreq * 100) / length(vals_cluster), 1)
+        #   }
+        # }
         
         # Common stopword list for chief complaint words
         stop_words <- c(
@@ -785,6 +815,41 @@ for (lag in initial_lags){
               CC_word = character(),
               stringsAsFactors = FALSE
             )
+            out[[freq_name]] <- integer()
+            out[[pct_name]] <- numeric()
+            return(out)
+          }
+          
+          out <- as.data.frame(table(words), stringsAsFactors = FALSE)
+          names(out) <- c("CC_word", freq_name)
+          out[[pct_name]] <- round((out[[freq_name]] * 100) / length(vals), 1)
+          out
+        }
+        
+        build_cc_table <- function(vals, freq_name, pct_name) {
+          vals <- vals[!is.na(vals)]
+          vals <- normalize_for_tokens(vals)
+          vals <- vals[trimws(vals) != ""]
+          
+          if (length(vals) == 0) {
+            out <- data.frame(CC_word = character(), stringsAsFactors = FALSE)
+            out[[freq_name]] <- integer()
+            out[[pct_name]] <- numeric()
+            return(out)
+          }
+          
+          words <- toupper(unlist(lapply(
+            strsplit(vals, " ", fixed = TRUE),
+            unique
+          )))
+          
+          words <- trimws(words)
+          words <- words[!is.na(words) & words != ""]
+          words <- words[!words %in% stop_words]
+          words <- words[nchar(words) >= 2]
+          
+          if (length(words) == 0) {
+            out <- data.frame(CC_word = character(), stringsAsFactors = FALSE)
             out[[freq_name]] <- integer()
             out[[pct_name]] <- numeric()
             return(out)
