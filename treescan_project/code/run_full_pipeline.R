@@ -55,7 +55,8 @@ if (isTRUE(first_time)){
     "png",
     "svDialogs",
     "tcltk",
-    "timeDate"
+    "timeDate",
+    "png"
   ))
 }
 
