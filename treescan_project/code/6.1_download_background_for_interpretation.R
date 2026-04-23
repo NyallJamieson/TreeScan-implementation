@@ -105,6 +105,49 @@ write_yearly <- function(df, out_dir2) {
   
   split_df <- split(df, df$file_year)
   
+  text_cols <- intersect(
+    c("ChiefComplaintParsed", "TriageNotesOrig", "TriageNotesParsed",
+      "Diagnosis_Combo", "Admit_Reason_Code", "DischargeDiagnosis",
+      "ChiefComplaintUpdates"),
+    names(df)
+  )
+  
+  for (nm in text_cols) {
+    df[[nm]] <- normalize_text_utf8(df[[nm]])
+  }
+  
+  for (y in names(split_df)) {
+    readr::write_csv(
+      split_df[[y]] %>% select(-file_year),
+      file.path(out_dir2, paste0("NSSP_", y, ".csv"))
+    )
+  }
+  
+  invisible(NULL)
+}
+
+write_yearly <- function(df, out_dir2) {
+  if (!"C_Visit_Date_Time" %in% names(df)) return(invisible(NULL))
+  
+  df <- df %>%
+    mutate(file_year = format(as.Date(C_Visit_Date_Time), "%Y")) %>%
+    filter(!is.na(file_year))
+  
+  if (nrow(df) == 0) return(invisible(NULL))
+  
+  text_cols <- intersect(
+    c("ChiefComplaintParsed", "TriageNotesOrig", "TriageNotesParsed",
+      "Diagnosis_Combo", "Admit_Reason_Code", "DischargeDiagnosis",
+      "ChiefComplaintUpdates"),
+    names(df)
+  )
+  
+  for (nm in text_cols) {
+    df[[nm]] <- normalize_text_utf8(df[[nm]])
+  }
+  
+  split_df <- split(df, df$file_year)
+  
   for (y in names(split_df)) {
     readr::write_csv(
       split_df[[y]] %>% select(-file_year),
