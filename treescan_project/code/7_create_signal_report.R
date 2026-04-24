@@ -10,7 +10,7 @@ library(tidyr)
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
 artifact_scores <- readRDS(paste0(parent_dir, "/data_artifact_assessment/artifact_scores.rds"))
 
-if (length(valid_nodes > 0)){
+if (length(all_valid_nodes > 0)){
   
   # Loop over lags
   for (lag in initial_lags){
