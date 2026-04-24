@@ -155,7 +155,9 @@ if (length(all_valid_nodes > 0)){
     # -----------------------------
     # 5) Assign trend
     # -----------------------------
-    TS_Results_today$Trend <- NA_character_
+    if (nrow(TS_Results_today) > 0){
+      TS_Results_today$Trend <- NA_character_
+    }
     
     assign_trend <- function(data_row, sigs_maxout = character(0)) {
       trend <- "5.Stable"
@@ -245,8 +247,10 @@ if (length(all_valid_nodes > 0)){
       )
     }
     
-    TS_Results_today <- TS_Results_today[order(TS_Results_today$Trend, TS_Results_today$Node.Identifier), ]
-    TS_Results_today <- TS_Results_today[, c("Trend", setdiff(names(TS_Results_today), "Trend"))]
+    if (nrow(TS_Results_today) > 0){
+      TS_Results_today <- TS_Results_today[order(TS_Results_today$Trend, TS_Results_today$Node.Identifier), ]
+      TS_Results_today <- TS_Results_today[, c("Trend", setdiff(names(TS_Results_today), "Trend"))]
+    }
     
     name <- paste0("TS_Results_Today_", lag)
     assign(name, TS_Results_today)
