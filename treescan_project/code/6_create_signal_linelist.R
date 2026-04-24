@@ -41,6 +41,9 @@ normalize_for_tokens <- function(x) {
 
 for (lag in initial_lags){
   
+  # TRUE/FALSE TO SAY SHOULD WE STOP
+  NO <- FALSE
+  
   # Get required nodes
   
   # Read in Results csv file (edit to match naming convention)
@@ -56,10 +59,16 @@ for (lag in initial_lags){
   # Reload just in case
   load(file.path(parent_dir, "myProfile.rda"))
   
-  # For time trend we need to download some background data
-  source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
-  
   if (length(Nodes) > 0){
+    
+    # For time trend we need to download some background data
+    source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
+    
+    # In 6.1 we check if no valid nodes after cleaning
+    # If so then we want to skip this lag and move to the next
+    if (isTRUE(NO)){
+      next
+    }
     
     # For time trend table pull in current year and additional 3 prior years
     yr_list <- (as.numeric(format(Sys.Date(),"%Y"))-3) : as.numeric(format(Sys.Date(),"%Y"))
@@ -240,7 +249,7 @@ for (lag in initial_lags){
       }
     }
     
-    END_DATE <- Sys.Date()-1 - lag
+    END_DATE <- Sys.Date() - lag
     
     # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
     # This has "date", "key", "dispo", "code" (in that order)
@@ -337,7 +346,6 @@ for (lag in initial_lags){
       # If baseline has records (i.e., not empty)
       if(nrow(temp1)>0)
       {
-        # merge linelist for cluster between original and study dataset to identify incident vs non-incident
         # merge linelist for cluster between original and study dataset to identify incident vs non-incident
         if (nrow(temp2) > 0) {
           temp2$dxtype <- 0
