@@ -48,10 +48,11 @@ valid_nodes <- Nodes[(nodes_clean %in% valid_nodes_clean)]
 
 # Stop execution if any invalid nodes are found
 if (length(valid_nodes) == 0) {
+  NO <- TRUE
   stop(
     paste(
       "The following entries in 'Nodes' are not valid TreeScan ICD-10 nodes:",
-      paste(unique(invalid_nodes), collapse = ", ")
+      paste(unique(valid_nodes), collapse = ", ")
     ),
     call. = FALSE
   )
