@@ -39,6 +39,9 @@ normalize_for_tokens <- function(x) {
   x
 }
 
+# We want to keep track of all valid nodes
+all_valid_nodes <- c()
+
 for (lag in initial_lags){
   
   # TRUE/FALSE TO SAY SHOULD WE STOP
@@ -63,6 +66,9 @@ for (lag in initial_lags){
     
     # For time trend we need to download some background data
     source(paste0(parent_dir, "/code/6.1_download_background_for_interpretation.R"))
+    
+    # Now add to all_valid_nodes
+    all_valid_nodes <- unique(append(all_valid_nodes, valid_nodes))
     
     # In 6.1 we check if no valid nodes after cleaning
     # If so then we want to skip this lag and move to the next
