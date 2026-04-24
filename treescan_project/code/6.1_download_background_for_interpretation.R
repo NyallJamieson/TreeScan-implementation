@@ -268,7 +268,7 @@ download_nssp <- function(start_date, end_date, diagnosis_code = node_code, out_
 # Just incase you closed server and the login details aren't loaded
 load(file.path(parent_dir, "myProfile.rda"))
 
-if (length(Nodes) > 0) {
+if (length(valid_nodes) > 0) {
   # Download the data
   res <- download_nssp(
     start_date = as.Date("2023-01-01"),
