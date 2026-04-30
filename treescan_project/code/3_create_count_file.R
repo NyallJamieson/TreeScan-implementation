@@ -79,6 +79,11 @@ for (LAG in initial_lags){
   ## Remove repeat rows
   sample_ED_data_long <- sample_ED_data_long %>% distinct()
   
+  # NEW LINE ADDED
+  # sample_ED_data_long <- sample_ED_data_long %>% mutate(code=gsub(\\.,"",code))
+  sample_ED_data_long <- sample_ED_data_long %>%
+    mutate(code = gsub("\\.", "", code))
+  
   ## Remove codes that are ineligible for this analysis
   # seasonal codes
   eligible_visit_codes=sample_ED_data_long[grepl("U071|J09|J10|J11|\\bJ301\\b|\\bJ302\\b|\\bJ3089\\b|\\bJ309\\b|J45|T7840",sample_ED_data_long$code)==F,]
@@ -228,6 +233,10 @@ for (LAG in initial_lags){
   code=unlist(strsplit(sample_ED_data$diagnosis_codes,split=" "))
   code=code[code!=""]
   dx_freq_table=data.frame(table(code))
+  
+  # NEW LINE
+  dx_freq_table <- data.frame(table(code)) %>%
+    mutate(code = gsub("\\.", "", code))
   
   # merge so that we have a column that is the frequency of every code in the original sample dataset
   study_data_long=merge(study_data_long, dx_freq_table,by="code",all.x=TRUE)
