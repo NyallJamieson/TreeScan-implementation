@@ -51,7 +51,7 @@ if (isTRUE(first_time)){
     "sodium",
     "data.table",
     "openxlsx",
-    "MMRRweek",
+    "MMWRweek",
     "png",
     "svDialogs",
     "tcltk",
