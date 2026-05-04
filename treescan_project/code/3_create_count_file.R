@@ -4,7 +4,7 @@
 for (LAG in initial_lags){
   print(paste0("Creating count file for lag ", LAG))
   
-  end <- Sys.Date() - LAG
+  end <- final_date - LAG
 
   ### CREATE COUNT FILE FOR ASYNDROMIC TREESCAN ANALYSIS
   ## Ramona Lall & Alison Levin-Rector
@@ -23,7 +23,7 @@ for (LAG in initial_lags){
   # set your working directory to point to "Preparing TreeScan Input Files" folder
   setwd(paste0(parent_dir, "/data"))
   
-  year <- 2025
+  year <- 2026
   
   # pull in 15 months of ED visit data ending 8/20/2024
   sample_ED_data <- readRDS(
@@ -31,7 +31,7 @@ for (LAG in initial_lags){
       parent_dir,
       "data",
       "datasets",
-      paste0("dataset_", Sys.Date(), ".rds")
+      paste0("dataset_", final_date, ".rds")
     )
   )
   sample_ED_data <- mutate(sample_ED_data,date=ymd(date))
@@ -281,9 +281,9 @@ for (LAG in initial_lags){
   # force exact column order expected downstream
   v2 <- v2[, c("date", "key", "dispo", "code")]
   
-  dir.create(file.path(parent_dir, "data", "v2", Sys.Date()), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path(parent_dir, "data", "v2", final_date), recursive = TRUE, showWarnings = FALSE)
   
-  write.csv(v2, paste0(parent_dir, "/data/v2/", Sys.Date(), "/lag", LAG, ".csv"), row.names = FALSE, quote = FALSE)
+  write.csv(v2, paste0(parent_dir, "/data/v2/", final_date, "/lag", LAG, ".csv"), row.names = FALSE, quote = FALSE)
 
   ### CREATE INPUT FILE
   # input file is unique visit date, codes and count of that combo
@@ -304,12 +304,12 @@ for (LAG in initial_lags){
   # Clean for the treescan input
   input_file <- input_file[, c(2, 1, 3)]
 
-  dir.create(paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", Sys.Date()), recursive = TRUE, showWarnings = FALSE)
+  dir.create(paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", final_date), recursive = TRUE, showWarnings = FALSE)
   
   # Write a PURE ASCII tab-delimited file (no BOM, no UTF-16)
   write.table(
     input_file[, c("code","date","n")],
-    file = paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", Sys.Date(), "/lag", LAG, ".txt"),
+    file = paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", final_date, "/lag", LAG, ".txt"),
     sep = "\t",
     row.names = FALSE,
     col.names = TRUE,
