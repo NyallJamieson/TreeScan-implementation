@@ -56,6 +56,8 @@ if (length(valid_nodes) == 0) {
     ),
     call. = FALSE
   )
+} else {
+  print(valid_nodes)
 }
 
 # If all nodes are valid, proceed
@@ -271,8 +273,8 @@ load(file.path(parent_dir, "myProfile.rda"))
 if (length(valid_nodes) > 0) {
   # Download the data
   res <- download_nssp(
-    start_date = as.Date("2023-01-01"),
-    end_date = Sys.Date(),
+    start_date = paste0(year(final_date)-3, "-01-01"),
+    end_date = final_date,
     out_dir_path = out_dir2,
     max_attempts = 5,
     wait_seconds = 15
