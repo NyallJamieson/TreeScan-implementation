@@ -56,7 +56,7 @@ get_lags_with_timeout <- function(timeout = 30, default = initial_lags) {
   result
 }
 
-is_weekend_or_us_holiday <- function(date = Sys.Date()) {
+is_weekend_or_us_holiday <- function(date = final_date) {
   date <- as.Date(date)
   
   # Weekend?
