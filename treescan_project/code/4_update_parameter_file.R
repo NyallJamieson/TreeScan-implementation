@@ -69,7 +69,7 @@ update_prm_file <- function(
   lines <- replace_path_value(
     lines,
     "tree-filename",
-    to_prm_path(parent_dir, "data", "Tree_File_20250629.csv")
+    to_prm_path(parent_dir, "data", "Tree_File_2026.csv")
   )
   
   lines <- replace_path_value(
