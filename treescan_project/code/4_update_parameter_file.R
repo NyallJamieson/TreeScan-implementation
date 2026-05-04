@@ -2,8 +2,8 @@ update_prm_file <- function(
     lag,
     template_lag = 0,
     days_back = 90,
-    todays_date = Sys.Date(),
-    end_date = Sys.Date() - lag
+    todays_date = final_date,
+    end_date = final_date - lag
 ) {
   end_date <- as.Date(end_date)
   start_date <- end_date - days_back
@@ -112,7 +112,7 @@ update_prm_file <- function(
 }
 
 # Also need to create the results file to save in
-dir.create(paste0(parent_dir, "/results/", Sys.Date()), recursive = TRUE, showWarnings = FALSE)
+dir.create(paste0(parent_dir, "/results/", final_date), recursive = TRUE, showWarnings = FALSE)
 
 for (LAG in initial_lags) {
   update_prm_file(lag = LAG)
