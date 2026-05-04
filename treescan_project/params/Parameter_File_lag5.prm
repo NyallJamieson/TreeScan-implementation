@@ -16,7 +16,7 @@ scan-rate-type=0
 
 [Input]
 ;tree structure filename
-tree-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Tree_File_20250629.csv
+tree-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Tree_File_2026.csv
 ;source type (CSV=0)
 tree-filename-SourceType=0
 ;source field map (comma separated list of integers)

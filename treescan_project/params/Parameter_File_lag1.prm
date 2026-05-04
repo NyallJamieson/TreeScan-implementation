@@ -16,7 +16,7 @@ scan-rate-type=0
 
 [Input]
 ;tree structure filename
-tree-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Tree_File_20250629.csv
+tree-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/Tree_File_2026.csv
 ;source type (CSV=0)
 tree-filename-SourceType=0
 ;source field map (comma separated list of integers)
@@ -30,7 +30,7 @@ tree-filename-SourceSkip=0
 ;csv source first row column header
 tree-filename-SourceFirstRowHeader=y
 ;count data filename
-count-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/analysis_count_files/Analysis_Count_File_2026-04-09/lag1.txt
+count-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/data/analysis_count_files/Analysis_Count_File_2021-02-28/lag1.txt
 ;source type (CSV=0)
 count-filename-SourceFieldMap=1,3,2
 count-filename-SourceDelimiter=
@@ -48,11 +48,11 @@ control-filename=
   ;date precision type (NONE=0, GENERIC=1, YEAR=2, MONTH=3, DAY=4)
 date-precision=4
 ;data time ranges: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-data-time-range=[2026/01/08,2026/04/08]
+data-time-range=[2020/11/29,2021/02/27]
 
 [Output]
 ;results filename
-results-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/results/2026-04-09/Results_lag1_2026-04-09.txt
+results-filename=C:/Users/nj7786/Documents/TreeScan-implementation/treescan_project/results/2021-02-28/Results_lag1_2021-02-28.txt
 ;create HTML results (y/n)
 results-html=y
 ;create CSV results (y/n)
@@ -102,9 +102,9 @@ prospective-analysis=y
 ;restrict temporal windows (y/n)
 restricted-window-range=n
 ;start data time range: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-window-start-range=[2026/01/08,2026/04/08]
+window-start-range=[2020/11/29,2021/02/27]
 ;end data time range: [integer,integer] or [yyyy/mm/dd,yyyy/mm/dd]
-window-end-range=[2026/01/08,2026/04/08]
+window-end-range=[2020/11/29,2021/02/27]
 
 [Adjustments]
 ;perform day of week adjustments (y/n)
@@ -116,7 +116,7 @@ exclusion-data-ranges=
   
   [Inference]
 ;number of simulation replications (0, 9, 999, n999)
-monte-carlo-replications=99999
+monte-carlo-replications=9999
 ;restrict tree levels evaluated (y/n)
 restrict-tree-levels=y
 ;tree levels excluded from evaluation (csv list of unsigned integers, root level is 1)
