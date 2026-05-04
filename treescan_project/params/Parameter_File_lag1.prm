@@ -116,7 +116,7 @@ exclusion-data-ranges=
   
   [Inference]
 ;number of simulation replications (0, 9, 999, n999)
-monte-carlo-replications=9999
+monte-carlo-replications=99999
 ;restrict tree levels evaluated (y/n)
 restrict-tree-levels=y
 ;tree levels excluded from evaluation (csv list of unsigned integers, root level is 1)
