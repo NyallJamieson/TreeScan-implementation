@@ -4,14 +4,14 @@ in_file <- file.path(
   parent_dir,
   "data",
   "datasets",
-  paste0("dataset_", Sys.Date(), ".rds")
+  paste0("dataset_", final_date, ".rds")
 )
 
 # Save data
-data <- readRDS(data, file = in_file)
+data <- readRDS(file = in_file)
 
 # What month-year are we in?
-year_month <- format(Sys.Date(), "%Y-%m")
+year_month <- format(final_date, "%Y-%m")
 
 monthly_lags_assessed <- list.files(
   paste0(parent_dir, "/lag/curves"),
@@ -294,7 +294,7 @@ if (!(isTRUE(have_we_got_lag) && isTRUE(have_we_got_databycode))){
        ylab = "Percentage of codes diagnosed (%)",
        type = "l",
        ylim = c(0, 100),
-       main = paste0("Lag curve ran on ", Sys.Date(), " for data 14-90 days ago"))
+       main = paste0("Lag curve ran on ", final_date, " for data 14-90 days ago"))
   
   # integer x values within the plotted range
   x_int <- seq(ceiling(min(x_days)), floor(max(x_days)), by = 1)
