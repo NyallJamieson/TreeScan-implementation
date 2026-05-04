@@ -9,23 +9,15 @@ library(tidyr)
 
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
 artifact_scores <- readRDS(paste0(parent_dir, "/data_artifact_assessment/artifact_scores.rds"))
+A <- readRDS(paste0("~/TreeScan-implementation/treescan_project/lag/curves/lag_curve_", format(final_date, "%Y-%m"), ".rds"))
+DFW <- readRDS("~/TreeScan-implementation/treescan_project/data/data for lag/data_For_lag.rds")
 
-if (length(all_valid_nodes > 0)){
+
+if (length(unique(valid_nodes)) > 0){
   
   # Loop over lags
   for (lag in initial_lags){
     print(paste0("We are now assessing lag ", lag))
-    
-    # Read in Results csv file (edit to match naming convention)
-    TS_Results_today <- read.csv(paste0(parent_dir, "/results/", Sys.Date(), "/Results_lag", lag, "_", Sys.Date(), ".csv"))
-    
-    # Signal criteria
-    TS_Results_today <- TS_Results_today[is.na(TS_Results_today$Recurrence.Interval) == F, ]
-    TS_Results_today <- TS_Results_today[which(TS_Results_today$Relative.Risk>=1.3),]
-    
-    # Admit signals have a lower threshold
-    TS_Results_today <- TS_Results_today[which((TS_Results_today$Recurrence.Interval >= 365)|(grepl("1\\-",TS_Results_today$Node.Identifier) & TS_Results_today$Recurrence.Interval>=100)),]
-    TS_Results_today$Node.Identifier=stri_replace_all_fixed(TS_Results_today$Node.Identifier, "\xa0", "")
     
     # Common cause (these are for the dummy nodes that link different parts of the tree)
     common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
@@ -373,6 +365,12 @@ if (length(all_valid_nodes > 0)){
   wb <- createWorkbook()
   addWorksheet(wb, "Signals")
   
+  TS_Results_today <- TS_Results_today %>%
+    select(-`Data artifact warning`)
+  
+  TS_Results_today <- TS_Results_today %>%
+    select(-`Masked in lag 1 warning`)
+  
   writeDataTable(wb, sheet = "Signals", x = TS_Results_today, tableStyle = "TableStyleMedium2")
   freezePane(wb, sheet = "Signals", firstRow = TRUE, firstCol = TRUE)
   setColWidths(wb, sheet = "Signals", cols = 1:ncol(TS_Results_today), widths = "auto")
@@ -386,6 +384,20 @@ if (length(all_valid_nodes > 0)){
   all_names <- names(TS_Results_today)
   ri_idx <- which(grepl("^RI_|^Recurrence.Interval$", all_names))
   rr_idx <- which(grepl("^RR_|^Relative.Risk$", all_names))
+  
+  artifact_score_col <- which(names(TS_Results_today) == "artifact_score")
+  
+  if (length(artifact_score_col) == 1 && nrow(TS_Results_today) > 0) {
+    conditionalFormatting(
+      wb,
+      sheet = "Signals",
+      cols = artifact_score_col,
+      rows = 2:(nrow(TS_Results_today) + 1),
+      type = "colorScale",
+      style = c("#006100", "#FFFFFF", "#9C0006"),
+      rule = c(-1, 0, 1)
+    )
+  }
   
   if (length(ri_idx) > 0) {
     addStyle(wb, "Signals", int_style,
@@ -443,6 +455,13 @@ if (length(all_valid_nodes > 0)){
   
   plot_num <- 0
   
+  # Pull out ICD-like codes from the whole column
+  all_codes <- regmatches(DFW$DischargeDiagnosisUpdates, gregexpr("\\b[A-Z][0-9]{2}(?:\\.[0-9A-Z]+)?\\b", DFW$DischargeDiagnosisUpdates))
+  
+  # Flatten and count
+  code_counts <- data.table(code = unlist(all_codes))[, .N, by = code][order(-N)]
+  code_counts <- sum(code_counts$N)
+  
   for (k in seq_along(node_codes)) {
     i <- node_codes[k]
     node_label <- node_identifiers[k]
@@ -481,15 +500,101 @@ if (length(all_valid_nodes > 0)){
       xlim_use <- range(xvals, na.rm = TRUE)
     }
     
+    i_esc <- stringr::str_escape(i)
+    
+    num1 <- DFW[, count := str_count(
+      DischargeDiagnosisUpdates,
+      regex(paste0("(?<![A-Z0-9.])", i_esc, "(?![A-Z0-9.])"))
+    )]
+    
+    num <- sum(num1$count)
+    
+    library(stringr)
+    
+    if (num == 0){
+      num <- sum(str_count(DFW$DischargeDiagnosis, paste0(";", i_esc)), na.rm = TRUE)
+    }
+    
+    # build the lookup once from your real xvals
+    x_lookup <- xvals / 24
+    y_lookup <- seq_along(xvals)
+    
+    get_y_for_x <- function(x_given) {
+      approx(
+        x = x_lookup,
+        y = y_lookup,
+        xout = x_given,
+        rule = 2
+      )$y
+    }
+    
+    x_lookup2 <- A$x_days
+    y_lookup2 <- A$y
+    
+    get_y_for_x2 <- function(x_given) {
+      approx(
+        x = x_lookup2,
+        y = y_lookup2,
+        xout = x_given,
+        rule = 2
+      )$y
+    }
+    
+    frac <- 100 * (num * get_y_for_x(seq(0, 5, by = 0.01))) / (code_counts * get_y_for_x2(seq(0, 5, by = 0.01)))
+    
+    par(mar = c(5, 5, 4, 6) + 0.1)
+    
+    # CDF plot
     plot(
       xvals / 24, 1:100,
-      xlim = c(0,5),
+      xlim = c(0, 5),
       pch = 1,
       main = paste0("Node", node_label, " ESSENCE-upload delay distribution"),
       xlab = "Time in days",
       ylab = "Percentage of diagnoses reported after ED visit",
-      type = "l"
+      type = "l",
+      lwd = 2
     )
+    
+    lines(A$x_days, A$y, lty = 2, col = "grey", lwd = 2)
+    
+    # Make an x-axis for frac that is the same length as frac
+    x_frac <- seq(0, 5, length.out = length(frac))
+    
+    # Overlay frac with right y-axis
+    par(new = TRUE)
+    
+    plot(
+      x_frac, frac,
+      type = "l",
+      axes = FALSE,
+      xlab = "",
+      ylab = "",
+      xlim = c(0, 5),
+      ylim = range(frac, na.rm = TRUE),
+      col = "red"
+    )
+    
+    axis(4, col = "red")
+    mtext("Proportion of diagnoses", side = 4, line = 3)
+    
+    legend(
+      "bottomright",
+      legend = c("ICD-specific code", "Pooled", "Proportion of volume"),
+      lty = c(1, 2, 1),
+      lwd = c(2, 2, 1),
+      col = c("black", "grey", "red"),
+      cex = 0.75,
+      inset = 0.02,
+      bg = "white"
+    )
+    
+    num1 <- DFW[, count := str_count(DischargeDiagnosisUpdates, paste0("\\b", i, "\\b"))]
+    num <- sum(num1$count)
+    
+    # Flatten and count
+    code_counts <- data.table(code = unlist(all_codes))[, .N, by = code][order(-N)]
+    code_counts <- sum(code_counts$N)
     
     # insert the current plot into Excel
     insertPlot(
