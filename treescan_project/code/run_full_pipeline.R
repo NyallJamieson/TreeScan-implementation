@@ -38,7 +38,7 @@ new_month <- ifelse(file.exists(paste0(parent_dir, "/lag/plots/lag_curve_", form
 
 # What date do you want to have as the end date of your analysis
 # leave as Sys.Date() if you want to do treescan in real time
-final_date <- as.Date("2021-02-28")
+final_date <- Sys.Date()
 
 # We need to install all required libraries, assuming you have none installed
 if (isTRUE(first_time)){
