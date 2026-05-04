@@ -2,6 +2,7 @@
 library(dplyr)
 library(stringr)
 library(data.table)
+library(lubridate)
 
 # Find path
 path <- paste0(parent_dir, "/raw_data") 
@@ -10,7 +11,7 @@ path <- paste0(parent_dir, "/raw_data")
 files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
 
 # Dates we want to get cleaned
-dates_16m <- seq.Date(to = Sys.Date() - 1, from = Sys.Date() %m-% months(16), by = "day")
+dates_16m <- seq.Date(to = final_date - 1, from = final_date %m-% months(16), by = "day")
 
 # Now get corresponding files
 files_from_dates <- file.path(
@@ -20,7 +21,13 @@ files_from_dates <- file.path(
 )
 
 # Join each chunked data together
-df_all <- do.call(rbind, lapply(files_from_dates, read.csv, stringsAsFactors = FALSE))
+df_all <- as.data.frame(rbindlist(
+  lapply(files_from_dates, function(f) {
+    fread(f, colClasses = list(character = "C_Visit_Date_Time"))
+  }),
+  use.names = TRUE,
+  fill = FALSE
+))
 
 # Set as data table for speed
 setDT(df_all)
@@ -54,7 +61,7 @@ out_file <- file.path(
   parent_dir,
   "data",
   "datasets",
-  paste0("dataset_", Sys.Date(), ".rds")
+  paste0("dataset_", final_date, ".rds")
 )
 
 # Ensure directory exists
@@ -66,7 +73,7 @@ saveRDS(data, file = out_file)
 # Now get subset of data for the lag assessment (if lag assessment is required)
 
 # What month-year are we in?
-year_month <- format(Sys.Date(), "%Y-%m")
+year_month <- format(final_date, "%Y-%m")
 
 monthly_lags_assessed <- list.files(
   paste0(parent_dir, "/lag/curves"),
@@ -82,9 +89,9 @@ if (!(isTRUE(have_we_got_lag) && isTRUE(have_we_got_dataforlag))){
   dir.create(paste0(parent_dir, "/data/data for lag"), recursive = TRUE, showWarnings = FALSE)
   
   # First we need to define some key dates
-  current_date <- Sys.Date()
-  current_date_minus_14 <- Sys.Date() - 14
-  current_date_minus_90 <- Sys.Date() - 90
+  current_date <- final_date
+  current_date_minus_14 <- final_date - 14
+  current_date_minus_90 <- final_date - 90
   dates_for_lag <- seq.Date(from = current_date_minus_90, to = current_date_minus_14, by = "day")
   
   # Now subset data to time period we're testing for lag structure
