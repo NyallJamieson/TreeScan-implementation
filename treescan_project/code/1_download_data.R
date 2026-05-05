@@ -141,7 +141,7 @@ make_backfill_chunks <- function(start_date, end_date, max_chunks = 4) {
 }
 
 download_nssp_backfill_and_refresh <- function(
-    end_date = Sys.Date(),
+    end_date = final_date,
     months_back = 16,
     refresh_days = 30,
     out_dir,
