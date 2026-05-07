@@ -41,10 +41,10 @@ valid_nodes <- unique(unlist(icd10_tree[, node_cols], use.names = FALSE))
 valid_nodes_clean <- clean_node(valid_nodes)
 
 # Clean the input Nodes vector
-nodes_clean <- clean_node(Nodes)
+nodes_clean <- clean_node(filtered_nodes)
 
 # Identify valid nodes
-valid_nodes <- Nodes[(nodes_clean %in% valid_nodes_clean)]
+valid_nodes <- filtered_nodes[(nodes_clean %in% valid_nodes_clean)]
 
 # Stop execution if any invalid nodes are found
 if (length(valid_nodes) == 0) {

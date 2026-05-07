@@ -87,6 +87,51 @@ for (lag in initial_lags){
   
 TS_Results_today <- TS_Results_all
 
+is_related_icd10 <- function(a, b) {
+  # Remove dots so T83.511 and T83511 compare cleanly
+  a_clean <- gsub("\\.", "", a)
+  b_clean <- gsub("\\.", "", b)
+  
+  startsWith(a_clean, b_clean) || startsWith(b_clean, a_clean)
+}
+
+keep_strongest_branch_signals <- function(nodes) {
+  kept <- character()
+  
+  for (node in nodes) {
+    # only apply this logic to ICD-10-like codes
+    is_icd <- grepl("^[A-Z][0-9]", node)
+    
+    if (!is_icd) {
+      kept <- c(kept, node)
+      next
+    }
+    
+    already_represented <- any(vapply(
+      kept,
+      function(k) {
+        grepl("^[A-Z][0-9]", k) && is_related_icd10(node, k)
+      },
+      logical(1)
+    ))
+    
+    if (!already_represented) {
+      kept <- c(kept, node)
+    }
+  }
+  
+  kept
+}
+
+filtered_nodes <- keep_strongest_branch_signals(Nodes)
+
+TS_Results_today <- TS_Results_today %>%
+  mutate(
+    node_clean = str_remove(Node.Identifier, "^[0-9]+-")
+  ) %>%
+  filter(node_clean %in% filtered_nodes) %>%
+  distinct(node_clean, .keep_all = TRUE)
+
 # Reload just in case
 load(file.path(parent_dir, "myProfile.rda"))
   
@@ -102,9 +147,9 @@ if (length(Nodes) > 0){
 
 # In 6.1 we check if no valid nodes after cleaning
 # If so then we want to skip this lag and move to the next
-if (length(all_valid_nodes == 0)){
-  next
-}
+# if (length(all_valid_nodes == 0)){
+#   next
+# }
     
 # For time trend table pull in current year and additional 3 prior years
 yr_list <- (as.numeric(format(final_date,"%Y"))-3) : as.numeric(format(final_date,"%Y"))
@@ -270,7 +315,42 @@ if (length(common_cause_codes) > 0) {
 }
 
 END_DATE <- final_date - lag
-    
+
+keep_cols <- c(
+  "date","time","key","hospital","zipcode","patientid","sex","age","age_group",
+  "race","ethnicity","chiefcomplaint","admitreason","diagnosiscode","diagnosistext",
+  "diagnosiscode1","modeofarrival","travelhistory","dischargedisposition","dispo",
+  "dischargedate","triagenote"
+)
+
+# archive_deduped match
+dx_clean_archive <- gsub("\\.", "", archive_deduped$diagnosiscode1)
+
+# v2 match
+code_clean_v2 <- gsub("\\.", "", v2$code)
+
+# ed match
+dx_clean_ed <- gsub("\\.", "", ed$diagnosiscode1)
+
+match_any_fixed <- function(x, codes) {
+  codes <- codes[!is.na(codes) & codes != ""]
+  if (length(codes) == 0) return(rep(FALSE, length(x)))
+  
+  out <- rep(FALSE, length(x))
+  for (code in codes) {
+    out <- out | grepl(code, x, fixed = TRUE)
+  }
+  out
+}
+
+archive_date <- as.Date(archive_deduped$date)
+v2_date <- as.Date(v2$date)
+
+match_date_archive <- !is.na(archive_date)
+match_date_v2 <- !is.na(v2_date)
+
+window_starts <- as.Date(TS_Results_today$Time.Window.Start)
+
 # For cluster and baseline linelist if you want to determine which are incident vs non-incident, you will also need to use v2 (this is the study dataset where we only kept incident diagnoses)
 # This has "date", "key", "dispo", "code" (in that order)
 for(i in 1:length(valid_nodes))
@@ -283,76 +363,50 @@ for(i in 1:length(valid_nodes))
   
   which(clean_node(TS_Results_today$Node.Identifier) == node_codes)[1]
   
-  keep_cols <- c(
-    "date","time","key","hospital","zipcode","patientid","sex","age","age_group",
-    "race","ethnicity","chiefcomplaint","admitreason","diagnosiscode","diagnosistext",
-    "diagnosiscode1","modeofarrival","travelhistory","dischargedisposition","dispo",
-    "dischargedate","triagenote"
-  )
+  match_dx_archive <- !is.na(dx_clean_archive) &
+    match_any_fixed(dx_clean_archive, node_codes)
   
-  # archive_deduped match
-  dx_clean_archive <- gsub("\\.", "", archive_deduped$diagnosiscode1)
-  match_dx_archive <- !is.na(dx_clean_archive) & vapply(
-   dx_clean_archive,
-   function(x) any(vapply(node_codes, function(code) grepl(code, x, fixed = TRUE), logical(1))),
-   logical(1)
-  )
+  match_dx_v2 <- !is.na(code_clean_v2) &
+    match_any_fixed(code_clean_v2, node_codes)
+  
+  match_dx_ed <- !is.na(dx_clean_ed) &
+    match_any_fixed(dx_clean_ed, node_codes)
   
   match_date_archive <- !is.na(archive_deduped$date)
   
-  temp <- archive_deduped[
-    match_dx_archive & match_date_archive &
-      archive_deduped$date >= as.Date(TS_Results_today$Time.Window.Start[i]),
-    keep_cols,
-    drop = FALSE
-  ]
-  
-  temp1 <- archive_deduped[
-    match_dx_archive & match_date_archive &
-      archive_deduped$date < as.Date(TS_Results_today$Time.Window.Start[i]),
-    keep_cols,
-    drop = FALSE
-  ]
-  
-  # v2 match
-  code_clean_v2 <- gsub("\\.", "", v2$code)
-  match_dx_v2 <- !is.na(code_clean_v2) & vapply(
-   code_clean_v2,
-   function(x) any(vapply(node_codes, function(code) grepl(code, x, fixed = TRUE), logical(1))),
-   logical(1)
-  )
-  
-  temp2 <- v2[
-    match_dx_v2 &
-      !is.na(v2$date) &
-      as.Date(v2$date) >= as.Date(TS_Results_today$Time.Window.Start[i]),
-    ,
-    drop = FALSE
-  ]
-  
-  temp21 <- v2[
-    match_dx_v2 &
-      !is.na(v2$date) &
-      as.Date(v2$date) < as.Date(TS_Results_today$Time.Window.Start[i]),
-    ,
-    drop = FALSE
-  ]
-  
   node_codes_clean <- gsub("\\.", "", node_codes)
-  
-  # ed match
-  dx_clean_ed <- gsub("\\.", "", ed$diagnosiscode1)
-  match_dx_ed <- !is.na(dx_clean_ed) & vapply(
-   dx_clean_ed,
-   function(x) any(vapply(node_codes_clean, function(code) grepl(code, x, fixed = TRUE), logical(1))),
-   logical(1)
-  )
   
   ed_keep <- ed[match_dx_ed, , drop = FALSE]
   
   if (nrow(ed_keep) == 0) next
   
   ed_keep$n <- 1
+  
+  window_start <- window_starts[i]
+  
+  temp <- archive_deduped[
+    match_dx_archive & match_date_archive & archive_date >= window_start,
+    keep_cols,
+    drop = FALSE
+  ]
+  
+  temp1 <- archive_deduped[
+    match_dx_archive & match_date_archive & archive_date < window_start,
+    keep_cols,
+    drop = FALSE
+  ]
+  
+  temp2 <- v2[
+    match_dx_v2 & match_date_v2 & v2_date >= window_start,
+    ,
+    drop = FALSE
+  ]
+  
+  temp21 <- v2[
+    match_dx_v2 & match_date_v2 & v2_date < window_start,
+    ,
+    drop = FALSE
+  ]
   
   # If baseline has records (i.e., not empty)
   if(nrow(temp1)>0)

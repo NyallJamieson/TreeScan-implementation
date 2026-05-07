@@ -25,32 +25,6 @@ for (LAG in initial_lags){
   
   year <- 2026
   
-  # pull in 15 months of ED visit data ending 8/20/2024
-  sample_ED_data <- readRDS(
-    file.path(
-      parent_dir,
-      "data",
-      "datasets",
-      paste0("dataset_", final_date, ".rds")
-    )
-  )
-  sample_ED_data <- mutate(sample_ED_data,date=ymd(date))
-  
-  # Split diagnosis codes into a list (one list per row)
-  sample_ED_data <- sample_ED_data %>%
-    mutate(code = strsplit(diagnosis_codes, split = " "))  # Split diagnosis codes
-  
-  # Transform so that each row is unique visit-code rather than unique visit 
-  sample_ED_data_long <- sample_ED_data %>%
-    unnest(code) 
-  
-  # remove spaces
-  sample_ED_data_long$code=gsub(" |  ","",sample_ED_data_long$code)
-  
-  # drop diagnosis_codes var
-  sample_ED_data_long <- sample_ED_data_long %>% 
-    select(-diagnosis_codes)
-  
   # Define a function to select the most severe outcome
   outcome_severity <- function(outcome) {
     # "Admit" is more severe than "Visit"
@@ -59,63 +33,126 @@ for (LAG in initial_lags){
     }
     return("V")
   }
-
-  ## For repeat visits on same day, keep more severe outcome (visit or admission)
-  sample_ED_data_long=sample_ED_data_long %>%
-    group_by(date, key) %>%
-    mutate(
-      # Keep the most severe outcome
-      severity = outcome_severity(severity)) %>%
-    ungroup()
   
-  ## Remove non-ICD10 codes
-  # Remove if starts with a digit
-  sample_ED_data_long=sample_ED_data_long[!grepl("^[0-9]",sample_ED_data_long$code),]
-  # Remove if no digit in code
-  sample_ED_data_long=sample_ED_data_long[grepl("\\d", sample_ED_data_long$code),]
-  # Remove empty values
-  sample_ED_data_long=sample_ED_data_long[which(sample_ED_data_long$code!=""),]
+  # Pull in 15 months of ED visit data ending 8/20/2024
+  sample_ED_data <- readRDS(
+    file.path(
+      parent_dir,
+      "data",
+      "datasets",
+      paste0("dataset_", final_date, ".rds")
+    )
+  )
   
-  ## Remove repeat rows
-  sample_ED_data_long <- sample_ED_data_long %>% distinct()
+  library(data.table)
+  library(stringr)
   
-  # NEW LINE ADDED
-  # sample_ED_data_long <- sample_ED_data_long %>% mutate(code=gsub(\\.,"",code))
-  sample_ED_data_long <- sample_ED_data_long %>%
-    mutate(code = gsub("\\.", "", code))
+  setDT(sample_ED_data)
+  
+  # Convert date and clean diagnosis_codes
+  sample_ED_data[, `:=`(
+    date = as.Date(date),
+    diagnosis_codes = str_squish(diagnosis_codes)
+  )]
+  
+  # Split diagnosis_codes into long format faster than separate_longer_delim()
+  split_codes <- strsplit(sample_ED_data$diagnosis_codes, " ", fixed = TRUE)
+  n_codes <- lengths(split_codes)
+  
+  sample_ED_data_long <- sample_ED_data[
+    rep.int(seq_len(.N), n_codes)
+  ]
+  
+  sample_ED_data_long[, code := unlist(split_codes, use.names = FALSE)]
+  sample_ED_data_long[, diagnosis_codes := NULL]
+  
+  # Clean and filter codes
+  sample_ED_data_long[, code := gsub("\\s+", "", code)]
+  sample_ED_data_long[, code := gsub(".", "", code, fixed = TRUE)]
+  
+  sample_ED_data_long <- sample_ED_data_long[
+    !is.na(code) &
+      code != "" &
+      !grepl("^[0-9]", code) &
+      grepl("\\d", code)
+  ]
+  
+  # For repeat visits on same day, keep more severe outcome
+  sample_ED_data_long[
+    ,
+    severity := outcome_severity(severity),
+    by = .(date, key)
+  ]
+  
+  # Remove duplicate rows
+  sample_ED_data_long <- unique(sample_ED_data_long)
   
   ## Remove codes that are ineligible for this analysis
-  # seasonal codes
-  eligible_visit_codes=sample_ED_data_long[grepl("U071|J09|J10|J11|\\bJ301\\b|\\bJ302\\b|\\bJ3089\\b|\\bJ309\\b|J45|T7840",sample_ED_data_long$code)==F,]
-  # certain Z codes
-  eligible_visit_codes=eligible_visit_codes[grepl("Z0|Z10|Z1152|Z12|Z13|Z14|Z15|Z17|Z18|Z19|Z21|Z28|Z30|Z3|Z4|Z50|Z51|Z52|Z53|Z55|Z56|Z62|Z63|Z64|Z66|Z67|Z68|Z76|Z78|Z8|Z90|Z91|Z92|Z93|Z94|Z95|Z96|Z97|Z98",eligible_visit_codes$code)==F,]
-  # neoplasms (C00*–D49*) and congenital malformations, deformations and chromosomal abnormalities (Q00*–Q99*)
-  eligible_visit_codes=eligible_visit_codes[grepl("\\bC|\\bD0|\\bD1|\\bD2|\\bD3|\\bD4|\\bQ",eligible_visit_codes$code)==F,]
+  
+  ineligible_code_pattern <- paste(
+    "U071|J09|J10|J11|\\bJ301\\b|\\bJ302\\b|\\bJ3089\\b|\\bJ309\\b|J45|T7840",
+    "Z0|Z10|Z1152|Z12|Z13|Z14|Z15|Z17|Z18|Z19|Z21|Z28|Z30|Z3|Z4|Z50|Z51|Z52|Z53|Z55|Z56|Z62|Z63|Z64|Z66|Z67|Z68|Z76|Z78|Z8|Z90|Z91|Z92|Z93|Z94|Z95|Z96|Z97|Z98",
+    "\\bC|\\bD0|\\bD1|\\bD2|\\bD3|\\bD4|\\bQ",
+    sep = "|"
+  )
+  
+  eligible_visit_codes <- sample_ED_data_long[
+    !grepl(ineligible_code_pattern, code)
+  ]
   
   ## Merge with tree file in wide format to get level2 and level3 parents for each code
-  icd10_treefile_wide <- read.delim(paste0(parent_dir, "/data/Tree_File_",year,"_wide_format.txt"))
-  eligible_visit_codes=merge(eligible_visit_codes, icd10_treefile_wide[,c("Name1","Level2","Level3")],by.x="code",by.y="Name1",all.x=TRUE)
   
-  # If code not recognized as belonging to tree file remove
-  eligible_visit_codes=eligible_visit_codes[is.na(eligible_visit_codes$Level2)==F & is.na(eligible_visit_codes$Level3)==F,]
+  icd10_treefile_wide <- fread(
+    file.path(parent_dir, "data", paste0("Tree_File_", year, "_wide_format.txt")),
+    select = c("Name1", "Level2", "Level3")
+  )
+  
+  ## Remove tree rows that would be removed after merge anyway
+  icd10_treefile_wide <- icd10_treefile_wide[
+    !is.na(Level2) & !is.na(Level3)
+  ]
+  
+  eligible_visit_codes <- merge(
+    eligible_visit_codes,
+    icd10_treefile_wide,
+    by.x = "code",
+    by.y = "Name1",
+    all = FALSE,
+    sort = TRUE
+  )
+  
+  setDT(eligible_visit_codes)
   
   # Transform again so each row is unique visit rather than unique visit-code
-  all_visits <- eligible_visit_codes %>%
-    group_by(date, key, severity) %>%
-    dplyr::summarize(
+  all_visits <- eligible_visit_codes[
+    ,
+    .(
       Level3 = paste(Level3, collapse = ","),
-      code = paste(code, collapse = ","),
-      .groups = 'keep'  # keep the grouping for further operations
-    )
+      code   = paste(code, collapse = ",")
+    ),
+    by = .(date, key, severity)
+  ]
   
   # Change Level 3 "-" to "_"
-  all_visits$Level3=gsub("\\-","_",all_visits$Level3)
+  all_visits[, Level3 := gsub("-", "_", Level3, fixed = TRUE)]
   
   ## Keep only incident diagnoses
-  # Separate dataset into one for patients with a single visit and one for patients with multiple visits
-  patient_list=data.frame(table(all_visits$key))
-  all_visits_single=all_visits[all_visits$key %in% patient_list$Var1[which(patient_list$Freq==1)],c("date","key","severity", "code", "Level3")]
-  all_visits_multiple=all_visits[all_visits$key %in% patient_list$Var1[which(patient_list$Freq>=2)],c("date","key","severity", "code", "Level3")]
+  
+  # Count number of visits per patient/key
+  all_visits[, visit_count := .N, by = key]
+  
+  all_visits_single <- all_visits[
+    visit_count == 1,
+    .(date, key, severity, code, Level3)
+  ]
+  
+  all_visits_multiple <- all_visits[
+    visit_count >= 2,
+    .(date, key, severity, code, Level3)
+  ]
+  
+  # Optional: remove helper column from all_visits
+  all_visits[, visit_count := NULL]
   
   # Define incident diagnosis for patients with multiple visits
   # Function to process each unique key
@@ -186,89 +223,312 @@ for (LAG in initial_lags){
     return(patient_data)
   }
   
-  # Apply the function to each unique key and create 'search' string
-  # search = all non admit codes for patient within the past year
+  process_patient_faster <- function(patient_data) {
+    
+    n <- nrow(patient_data)
+    
+    dates_num <- as.numeric(patient_data$date)
+    severity  <- patient_data$severity
+    level3    <- patient_data$Level3
+    
+    search  <- rep(NA_character_, n)
+    search2 <- rep(NA_character_, n)
+    search3 <- rep(NA_character_, n)
+    searchf <- rep(NA_character_, n)
+    
+    level3_space <- gsub(",", " ", level3, fixed = TRUE)
+    level3_split_space <- strsplit(level3_space, " ", fixed = TRUE)
+    level3_split_comma <- strsplit(level3, ",", fixed = TRUE)
+    
+    ## search = prior Level3 codes within 365 days
+    
+    for (i in seq_len(n)) {
+      
+      if (i == 1L) {
+        search[i] <- "NONE"
+      } else {
+        prior_idx <- which(
+          seq_len(n) < i &
+            abs(dates_num - dates_num[i]) <= 365
+        )
+        
+        if (length(prior_idx) == 0L) {
+          search[i] <- "NONE"
+        } else {
+          prior_codes <- unlist(level3_split_space[prior_idx], use.names = FALSE)
+          prior_codes <- prior_codes[!is.na(prior_codes)]
+          search[i] <- paste0(unique(prior_codes), collapse = "|")
+        }
+      }
+    }
+    
+    admit_idx <- which(severity == "A")
+    n_admit <- length(admit_idx)
+    
+    if (n_admit >= 1L) {
+      
+      admit_dates <- dates_num[admit_idx]
+      
+      for (i in seq_len(n_admit)) {
+        
+        this_admit_row  <- admit_idx[i]
+        this_admit_date <- dates_num[this_admit_row]
+        
+        prior_admit_exists <- any(
+          seq_len(n_admit) < i &
+            abs(admit_dates - admit_dates[i]) <= 365
+        )
+        
+        if (!prior_admit_exists) {
+          search2[this_admit_row] <- "NONE"
+        }
+        
+        prior_visit_idx <- which(
+          dates_num - this_admit_date < 0 &
+            dates_num - this_admit_date >= -365 &
+            severity == "V"
+        )
+        
+        if (length(prior_visit_idx) > 0L) {
+          
+          existing_codes <- unlist(strsplit(search2[i], "\\|"), use.names = FALSE)
+          existing_codes <- existing_codes[!is.na(existing_codes)]
+          
+          new_codes <- level3_split_comma[[this_admit_row]]
+          new_codes <- new_codes[!is.na(new_codes)]
+          
+          search2[prior_visit_idx] <- paste0(
+            unique(c(existing_codes, new_codes)),
+            collapse = "|"
+          )
+        }
+      }
+      
+      if (n_admit >= 2L) {
+        
+        for (i in 2:n_admit) {
+          
+          this_admit_row <- admit_idx[i]
+          this_admit_date <- dates_num[this_admit_row]
+          
+          prior_admit_rows <- admit_idx[
+            admit_dates - this_admit_date < 0 &
+              admit_dates - this_admit_date >= -365
+          ]
+          
+          list_codes <- paste0(level3[prior_admit_rows], collapse = ",")
+          
+          search3[this_admit_row] <- paste0(
+            setdiff(
+              level3_split_comma[[this_admit_row]],
+              unlist(strsplit(list_codes, ",", fixed = TRUE), use.names = FALSE)
+            ),
+            collapse = "|"
+          )
+        }
+      }
+    }
+    
+    for (i in seq_len(n)) {
+      
+      if (!is.na(search3[i])) {
+        search[i] <- gsub(search3[i], "", search[i])
+      }
+      
+      if (is.na(search2[i])) {
+        searchf[i] <- search[i]
+      } else if (!is.na(search2[i]) && search2[i] != "NONE" && search[i] == "NONE") {
+        searchf[i] <- search2[i]
+      } else if (search2[i] == "NONE") {
+        searchf[i] <- "NONE"
+      } else {
+        searchf[i] <- paste0(c(search[i], na.omit(search2[i])), collapse = "|")
+      }
+    }
+    
+    patient_data$search  <- search
+    patient_data$search2 <- search2
+    patient_data$search3 <- search3
+    patient_data$searchf <- searchf
+    
+    patient_data
+  }
+  
+  setDT(all_visits_multiple)
+  
+  # Apply the faster function to each unique key and create search strings
+  # search  = all non-admit codes for patient within the past year
   # search2 = all admit codes for patient within the next year
   # searchf = both combined
-  all_visits_multiple_search <- all_visits_multiple %>%
-    group_by(key) %>%
-    group_split() %>%
-    purrr::map_dfr(process_patient)
+  all_visits_multiple_search <- all_visits_multiple[
+    ,
+    process_patient_faster(.SD),
+    by = key
+  ]
   
-  # Use 'search string' to find non-incident codes to remove
-  # remove searchf codes from level3 and subs REMOVE for corresponding code under level3
-  remove_nonincident <- all_visits_multiple_search %>%
-    mutate(Level3 = purrr::map2_chr(Level3, searchf, ~gsub(.y, "REMOVE", .x))) %>%
-    mutate(code = purrr::map2_chr(code, Level3, ~{
-      codes <- unlist(strsplit(.x, ","))
-      lvl3 <- unlist(strsplit(.y, ","))
-      codes[lvl3 == "REMOVE"] <- "REMOVE"
-      paste0(codes, collapse = ",")
-    }))
+  # Use search string to find non-incident codes to remove
+  # remove searchf codes from Level3 and substitute REMOVE for corresponding code
+  remove_nonincident <- copy(all_visits_multiple_search)
   
+  remove_nonincident[
+    ,
+    Level3 := mapply(
+      function(Level3, searchf) {
+        gsub(searchf, "REMOVE", Level3)
+      },
+      Level3,
+      searchf,
+      USE.NAMES = FALSE
+    )
+  ]
   
-  # merge back with patients with 1 visit
+  remove_nonincident[
+    ,
+    code := mapply(
+      function(code, Level3) {
+        codes <- unlist(strsplit(code, ",", fixed = TRUE), use.names = FALSE)
+        lvl3  <- unlist(strsplit(Level3, ",", fixed = TRUE), use.names = FALSE)
+        
+        codes[lvl3 == "REMOVE"] <- "REMOVE"
+        
+        paste0(codes, collapse = ",")
+      },
+      code,
+      Level3,
+      USE.NAMES = FALSE
+    )
+  ]
+  
+  setDT(all_visits_single)
+  setDT(remove_nonincident)
+  
+  # Merge back with patients with 1 visit
   # every row is a unique patient-visit
-  study_cohort=rbind(all_visits_single[,c("date","key","severity","code")],remove_nonincident[,c("date","key","severity","code")])
-
+  study_cohort <- rbindlist(
+    list(
+      all_visits_single[, .(date, key, severity, code)],
+      remove_nonincident[, .(date, key, severity, code)]
+    ),
+    use.names = TRUE
+  )
+  
   # Keep 90-day study period
-  study_data <- study_cohort[which(study_cohort$date>=end-90+1),]
-  study_data <- study_data[which(study_data$date<=end),]
+  study_data <- study_cohort[
+    date >= end - 90 + 1 &
+      date <= end
+  ]
   
-  # Make long dataset
-  # Split diagnosis codes into a list (one list per row)
-  study_data <- study_data %>%
-    mutate(code = strsplit(code, split = ","))  # Split diagnosis codes
-  # Directly unnest the list into a long format 
-  study_data_long <- study_data %>%
-    unnest(code) 
+  # Make long dataset by splitting diagnosis codes
+  split_codes <- strsplit(study_data$code, ",", fixed = TRUE)
+  n_codes <- lengths(split_codes)
   
-  # remove non-incident codes
-  study_data_long=study_data_long[which(study_data_long$code!="REMOVE"),]
+  study_data_long <- study_data[
+    rep.int(seq_len(.N), n_codes)
+  ]
   
+  study_data_long[
+    ,
+    code := unlist(split_codes, use.names = FALSE)
+  ]
+  
+  # Remove non-incident codes
+  study_data_long <- study_data_long[
+    code != "REMOVE"
+  ]
+  
+  setDT(sample_ED_data)
+  setDT(study_data_long)
+  setDT(icd10_treefile_wide)
   
   # Keep unique
-  # If multiple codes within same visit with same level 3, keep rarest
-  # string of all codes in original sample dataset, deleting blanks
-  code=unlist(strsplit(sample_ED_data$diagnosis_codes,split=" "))
-  code=code[code!=""]
-  dx_freq_table=data.frame(table(code))
+  # If multiple codes within same visit with same Level3, keep rarest
   
-  # NEW LINE
-  dx_freq_table <- data.frame(table(code)) %>%
-    mutate(code = gsub("\\.", "", code))
+  # String of all codes in original sample dataset, deleting blanks
+  code <- unlist(
+    strsplit(sample_ED_data$diagnosis_codes, split = " ", fixed = TRUE),
+    use.names = FALSE
+  )
   
-  # merge so that we have a column that is the frequency of every code in the original sample dataset
-  study_data_long=merge(study_data_long, dx_freq_table,by="code",all.x=TRUE)
+  code <- code[code != ""]
+  code <- gsub(".", "", code, fixed = TRUE)
   
-  #if Multiple codes in Level3 keep the rarest
-  study_data_long=merge(study_data_long,icd10_treefile_wide[,c("Name1","Level3")],by.x="code",by.y="Name1",all.x=TRUE)
+  # Frequency table for every code in the original sample dataset
+  dx_freq_table <- as.data.table(table(code))
+  setnames(dx_freq_table, c("code", "Freq"))
   
-  # create column n that counts the number of codes with the same level3 during the same visit
-  # sort in order of increasing frequency, so rarest is first
-  study_data_long <- study_data_long %>%
-    dplyr::arrange(key, date, Level3, Freq) %>%  # Sort the data
-    dplyr::group_by(key, date, Level3) %>%       # Group by key, date, Level3
-    dplyr::mutate(n = row_number())              # Add row number within each group
+  # Merge so that we have a column that is the frequency of every code
+  # in the original sample dataset
+  study_data_long <- merge(
+    study_data_long,
+    dx_freq_table,
+    by = "code",
+    all.x = TRUE,
+    sort = FALSE
+  )
   
-  # if the >=2 codes in same visit with same level3, keep the first row, which is the rarest
-  # if there are >=2 visits for the same person with equally rare codes, keep all rarest
-  keep_rarest <-study_data_long %>%
-    dplyr::group_by(key, date, Level3) %>%
-    dplyr::filter(n() >= 2 & (Freq == first(Freq))) 
-  # if codes with same level3 in the same visit are equally rare, keep a random row
-  tie_breaker <- keep_rarest %>%
-    dplyr::group_by(key, date, Level3) %>%
-    dplyr::mutate(n = sample(seq_along(Freq), size = n(), replace = FALSE)) %>%  # Randomly shuffle within the group
-    dplyr::filter(n == 1)  # Keep only the randomly selected row
+  # Add Level3
+  study_data_long <- merge(
+    study_data_long,
+    icd10_treefile_wide[, .(Name1, Level3)],
+    by.x = "code",
+    by.y = "Name1",
+    all.x = TRUE,
+    sort = FALSE
+  )
   
-  # these are all the rest (visits with no repeat level3 codes)
-  no_repeats <- study_data_long %>%
-    dplyr::group_by(key, date, Level3) %>%
-    dplyr::filter(!(n() >= 2 & (Freq == first(Freq)))) %>%  
-    dplyr::filter(n == 1)  
+  # Sort in order of increasing frequency, so rarest is first
+  setorder(study_data_long, key, date, Level3, Freq)
   
-  study_data_long=rbind(no_repeats,tie_breaker)
+  # Create column n that counts the number of codes with the same Level3
+  # during the same visit
+  study_data_long[
+    ,
+    n := seq_len(.N),
+    by = .(key, date, Level3)
+  ]
+  
+  setDT(study_data_long)
+  
+  # Same as:
+  # group_by(key, date, Level3) %>%
+  # filter(n() >= 2 & Freq == first(Freq))
+  keep_rarest <- study_data_long[
+    ,
+    .SD[.N >= 2L & Freq == Freq[1L]],
+    by = .(key, date, Level3)
+  ]
+  
+  # Same as:
+  # mutate(n = sample(seq_along(Freq), size = n(), replace = FALSE)) %>%
+  # filter(n == 1)
+  tie_breaker <- keep_rarest[
+    ,
+    {
+      tmp <- copy(.SD)
+      tmp[, n := sample(seq_along(Freq), size = .N, replace = FALSE)]
+      tmp[n == 1L]
+    },
+    by = .(key, date, Level3)
+  ]
+  
+  # Same as:
+  # group_by(key, date, Level3) %>%
+  # filter(!(n() >= 2 & Freq == first(Freq))) %>%
+  # filter(n == 1)
+  no_repeats <- study_data_long[
+    ,
+    .SD[
+      !(.N >= 2L & Freq == Freq[1L]) &
+        n == 1L
+    ],
+    by = .(key, date, Level3)
+  ]
+  
+  study_data_long <- rbindlist(
+    list(no_repeats, tie_breaker),
+    use.names = TRUE,
+    fill = TRUE
+  )
   
   v2 <- study_data_long[, c("date", "key", "severity", "code")]
   names(v2) <- c("date", "key", "dispo", "code")
@@ -286,23 +546,46 @@ for (LAG in initial_lags){
   write.csv(v2, paste0(parent_dir, "/data/v2/", final_date, "/lag", LAG, ".csv"), row.names = FALSE, quote = FALSE)
 
   ### CREATE INPUT FILE
+  setDT(study_data_long)
+  
+  ## CREATE INPUT FILE
   # input file is unique visit date, codes and count of that combo
-  input_file=aggregate(n ~ code+severity+date, data = study_data_long[,c("date","code","severity","n")], FUN = sum)
-  # add decimal
-  input_file$code=ifelse(nchar(input_file$code)>=4,paste0(substr(input_file$code,1,3),".",substr(input_file$code,4,nchar(input_file$code))),input_file$code)
-  # add 0- and 1-
-  input_file$code1=ifelse(input_file$severity=="V",paste0("0-",input_file$code),paste0("1-",input_file$code))
   
-  input_file=input_file[,c("code1","date","n")]
-  names(input_file)[names(input_file)=="code1"]="code"
+  input_file <- study_data_long[
+    ,
+    .(n = sum(n)),
+    by = .(code, severity, date)
+  ]
   
-  # clean fields
-  input_file$code <- trimws(input_file$code)
-  input_file$date <- format(as.Date(input_file$date), "%Y/%m/%d")
-  input_file$n <- as.integer(input_file$n)
+  # Add decimal
+  input_file[
+    nchar(code) >= 4L,
+    code := paste0(
+      substr(code, 1L, 3L),
+      ".",
+      substr(code, 4L, nchar(code))
+    )
+  ]
   
-  # Clean for the treescan input
-  input_file <- input_file[, c(2, 1, 3)]
+  # Add 0- and 1-
+  input_file[
+    ,
+    code := fifelse(
+      severity == "V",
+      paste0("0-", code),
+      paste0("1-", code)
+    )
+  ]
+  
+  # Keep and order final columns
+  input_file <- input_file[
+    ,
+    .(
+      date = format(as.Date(date), "%Y/%m/%d"),
+      code = trimws(code),
+      n = as.integer(n)
+    )
+  ]
 
   dir.create(paste0(parent_dir, "/data/analysis_count_files/Analysis_Count_File_", final_date), recursive = TRUE, showWarnings = FALSE)
   
