@@ -153,21 +153,42 @@ if (length(Nodes) > 0){
     
 # For time trend table pull in current year and additional 3 prior years
 yr_list <- (as.numeric(format(final_date,"%Y"))-3) : as.numeric(format(final_date,"%Y"))
-    
+
 # Bit of tidying up before importing data
-files <- list.files(paste0(parent_dir, "/data_for_interpretation"),
-                    pattern = ".csv$",
-                    full.names = TRUE
+files_all <- list.files(paste0(parent_dir, "/data_for_interpretation"),
+                        pattern = ".csv$",
+                        full.names = TRUE
 )
-    
-year_dfs <- lapply(files, function(x) {
-  bind_rows(lapply(x, function(f) {
-    read_csv(
-      f,
-      col_types = cols(.default = col_character()),
-      show_col_types = FALSE
-    )
-  }))
+
+# Keep only files for the years we actually need
+files <- files_all[
+  grepl(
+    paste0("(", paste(yr_list, collapse = "|"), ")"),
+    basename(files_all)
+  )
+]
+
+files <- sort(files)
+
+message("Expected years: ", paste(yr_list, collapse = ", "))
+message("Files selected:")
+print(basename(files))
+
+if (length(files) != length(yr_list)) {
+  stop(
+    "Expected ", length(yr_list), " files for years ",
+    paste(yr_list, collapse = ", "),
+    " but found ", length(files), ": ",
+    paste(basename(files), collapse = ", ")
+  )
+}
+
+year_dfs <- lapply(files, function(f) {
+  read_csv(
+    f,
+    col_types = cols(.default = col_character()),
+    show_col_types = FALSE
+  )
 })
 
 # However you import data; I use import_data_specdates function
@@ -361,7 +382,14 @@ for(i in 1:length(valid_nodes))
   node_codes <- valid_nodes[i]
   node_codes <- gsub("\\.", "", node_codes)
   
-  which(clean_node(TS_Results_today$Node.Identifier) == node_codes)[1]
+  ts_idx <- which(clean_node(TS_Results_today$Node.Identifier) == node_codes)[1]
+  
+  if (is.na(ts_idx)) {
+    message("Skipping node not present in filtered TS_Results_today: ", node_codes)
+    next
+  }
+  
+  window_start <- as.Date(TS_Results_today$Time.Window.Start[ts_idx])
   
   match_dx_archive <- !is.na(dx_clean_archive) &
     match_any_fixed(dx_clean_archive, node_codes)
@@ -382,7 +410,6 @@ for(i in 1:length(valid_nodes))
   
   ed_keep$n <- 1
   
-  window_start <- window_starts[i]
   
   temp <- archive_deduped[
     match_dx_archive & match_date_archive & archive_date >= window_start,

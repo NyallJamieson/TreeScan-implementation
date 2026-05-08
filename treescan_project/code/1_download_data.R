@@ -151,7 +151,8 @@ download_nssp_backfill_and_refresh <- function(
       "C_Visit_Date_Time",
       "DischargeDiagnosisUpdates",
       "DischargeDiagnosisMDTUpdates",
-      "HasBeenAdmitted"
+      "HasBeenAdmitted",
+      "Region"
     ),
     geographySystem = "hospitalregion",
     geographies = NULL,
