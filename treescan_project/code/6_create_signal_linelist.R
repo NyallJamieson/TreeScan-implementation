@@ -12,6 +12,7 @@ library("MMWRweek")
 library("stringi")
 library("lubridate")
 library("openxlsx")
+library("stringr")
 
 # Helper functions for if we get bad characters
 normalize_text_utf8 <- function(x) {
@@ -1383,6 +1384,7 @@ for(i in 1:length(valid_nodes))
   # If baseline is empty
   if(nrow(temp1)==0)
   {
+    next
     # Merging original and study dataset to identify incident vs. non-incident
     if(nrow(temp2)>0)
     {

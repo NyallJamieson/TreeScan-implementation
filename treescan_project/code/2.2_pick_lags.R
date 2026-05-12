@@ -1,5 +1,5 @@
 # Set to true if you want to change (or re-assess) the lags you're using
-initial_lags <- c(1,4)
+initial_lags <- c(1)
 
 script_path <- file.path(parent_dir, "code", "2.2_pick_lags.R")
 

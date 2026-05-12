@@ -463,6 +463,7 @@ if (length(unique(valid_nodes)) > 0){
   code_counts <- sum(code_counts$N)
   
   for (k in seq_along(node_codes)) {
+    print(k)
     i <- node_codes[k]
     node_label <- node_identifiers[k]
     
@@ -539,6 +540,18 @@ if (length(unique(valid_nodes)) > 0){
         rule = 2
       )$y
     }
+    
+    result <- tryCatch(
+      {
+        get_y_for_x(seq(0, 5, by = 0.01))
+      },
+      error = function(e) {
+        message("Skipping")
+        return(NULL)
+      }
+    )
+    
+    if (is.null(result)) next
     
     frac <- 100 * (num * get_y_for_x(seq(0, 5, by = 0.01))) / (code_counts * get_y_for_x2(seq(0, 5, by = 0.01)))
     
@@ -618,7 +631,7 @@ if (length(unique(valid_nodes)) > 0){
   # -----------------------------
   # 8) Save
   # -----------------------------
-  out_file <- file.path(parent_dir, "signal_report", paste0("Signals_Report_", Sys.Date(), ".xlsx"))
+  out_file <- file.path(parent_dir, "signal_report", paste0("Signals_Report_", final_date, ".xlsx"))
   saveWorkbook(wb, out_file, overwrite = TRUE)
   
   message("Workbook saved to: ", out_file)

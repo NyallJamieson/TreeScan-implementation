@@ -33,12 +33,12 @@ reassess <- TRUE
 
 # What date do you want to have as the end date of your analysis
 # leave as Sys.Date() if you want to do treescan in real time
-final_date <- Sys.Date()
+final_date <- as.Date("2023-11-15")
 
 # Is it a new month?
 # If so then set to true.
 # Also set to true if you want to re-assess the lag situation
-new_month <- ifelse(file.exists(paste0(parent_dir, "/lag/plots/lag_curve_", format(final_date, "%Y-%m"), ".png")), FALSE, TRUE)
+new_month <- ifelse(file.exists(paste0(parent_dir, "/lag/plots/lag_curve_", format(as.Date(final_date), "%Y-%m"), ".png")), FALSE, TRUE)
 
 # We need to install all required libraries, assuming you have none installed
 if (isTRUE(first_time)){
@@ -124,6 +124,8 @@ if (lag_choice == 1){
 
 # Now get metrics on whether a code is a data artifact
 source(paste0(parent_dir, "/code/2.4_data_artifact_check.R"))
+
+# If you are running not in real time, then you likely don't want to run on multiple lags
 
 # Create the count file
 source(paste0(parent_dir, "/code/3_create_count_file.R"))
