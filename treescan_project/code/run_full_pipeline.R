@@ -18,6 +18,18 @@ first_time <- FALSE
 # If on server, set as true; otherwise, set as false
 server <- FALSE
 
+# Do you want to run on a subregion of your jurisdiction?
+# e.g., TX_Tarrant in Texas?
+subregion <- FALSE
+
+# If subregion = TRUE, then what subregion? (this has TX_Travis as default)
+which_subregion <- c("TX_Travis")
+# This CAN include multiple regions: e.g., c("TX_Tarrant", "TX_Harris")
+
+# How many processors do you want to use?
+# select number below; 0 means use all available (which was the previous default)
+number_processors <- 2
+
 # Are you going to set this for batch or be more hands on?
 # There are two options for lag selection for this pipeline
 # 1) you run daily and on the first day of the month check lag curve yourself,
@@ -33,7 +45,7 @@ reassess <- TRUE
 
 # What date do you want to have as the end date of your analysis
 # leave as Sys.Date() if you want to do treescan in real time
-final_date <- as.Date("2023-11-15")
+final_date <- Sys.Date()
 
 # Is it a new month?
 # If so then set to true.
@@ -75,6 +87,9 @@ source(paste0(parent_dir, "/code/0_locate_treescan.R"))
 
 # Run the script that downloads the required data
 source(paste0(parent_dir, "/code/1_download_data.R"))
+
+# Run the script that subsets your download data if you requested
+source(paste0(parent_dir, "/code/1.1_subset_downloaded_data.R"))
 
 # Run the script that cleans the downloaded NSSP Essence data
 source(paste0(parent_dir, "/code/2_clean_downloaded_data.R"))
