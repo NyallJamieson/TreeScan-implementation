@@ -101,6 +101,13 @@ update_prm_file <- function(
     to_prm_path(parent_dir, "data", "Do_not_evaluate_nodes.csv")
   )
   
+  # Update number of processors
+  lines <- sub(
+    "^parallel-processes=.*",
+    paste0("parallel-processes=", number_processors),
+    lines
+  )
+  
   writeLines(lines, prm_out)
   
   invisible(list(

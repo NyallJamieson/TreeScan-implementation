@@ -78,7 +78,7 @@ build_url <- function(start_date, end_date, diagnosis_code = node_code) {
     "&detector=probrepswitch",
     "&timeResolution=daily",
     diagnosis_code,
-    "&field=C_Unique_Patient_ID&field=DischargeDiagnosis&field=ChiefComplaintParsed&field=Age&field=C_Visit_Date_Time&field=C_Visit_Date_Source&field=C_Patient_Class&field=Region&field=Hospital&field=HospitalZip&field=Patient_Zip&field=DischargeDiagnosisUpdates&field=DischargeDiagnosisMDTUpdates&field=DischargeDisposition&field=HasBeenAdmitted&field=Sex&field=C_Race&field=C_Ethnicity&field=Admit_Reason_Code&field=ModeOfArrival&field=Travel_History&field=TriageNotesParsed&field=Discharge_Date_Time&field=Diagnosis_Combo&field=TriageNotesOrig&field=ChiefComplaintUpdates"
+    "&field=C_Unique_Patient_ID&field=DischargeDiagnosis&field=ChiefComplaintParsed&field=Age&field=C_Visit_Date_Time&field=C_Visit_Date_Source&field=C_Patient_Class&field=Region&field=Hospital&field=HospitalZip&field=Patient_Zip&field=DischargeDiagnosisUpdates&field=DischargeDiagnosisMDTUpdates&field=DischargeDisposition&field=HasBeenAdmitted&field=Sex&field=C_Race&field=C_Ethnicity&field=Admit_Reason_Code&field=ModeOfArrival&field=Travel_History&field=TriageNotesParsed&field=Discharge_Date_Time&field=Diagnosis_Combo&field=TriageNotesOrig&field=ChiefComplaintUpdates&field=HospitalName"
   )
 }
 

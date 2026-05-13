@@ -4,8 +4,13 @@ library(stringr)
 library(data.table)
 library(lubridate)
 
-# Find path
-path <- paste0(parent_dir, "/raw_data") 
+if (isTRUE(subregion)){
+  # Find path
+  path <- paste0(parent_dir, "/raw_data_subset") 
+} else {
+  # Find path
+  path <- paste0(parent_dir, "/raw_data") 
+}
 
 # Load data
 files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
@@ -13,12 +18,21 @@ files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
 # Dates we want to get cleaned
 dates_16m <- seq.Date(to = final_date - 1, from = final_date %m-% months(16), by = "day")
 
-# Now get corresponding files
-files_from_dates <- file.path(
-  parent_dir,
-  "raw_data",
-  paste0("NSSP_data_", dates_16m, "_to_", dates_16m, ".csv")
-)
+if (isTRUE(subregion)){
+  # Now get corresponding files
+  files_from_dates <- file.path(
+    parent_dir,
+    "raw_data_subset",
+    paste0("NSSP_data_", dates_16m, "_to_", dates_16m, ".csv")
+  )
+} else {
+  # Now get corresponding files
+  files_from_dates <- file.path(
+    parent_dir,
+    "raw_data",
+    paste0("NSSP_data_", dates_16m, "_to_", dates_16m, ".csv")
+  )
+}
 
 # Join each chunked data together
 df_all <- as.data.frame(rbindlist(

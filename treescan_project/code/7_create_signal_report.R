@@ -9,32 +9,61 @@ library(tidyr)
 
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
 artifact_scores <- readRDS(paste0(parent_dir, "/data_artifact_assessment/artifact_scores.rds"))
-A <- readRDS(paste0("~/TreeScan-implementation/treescan_project/lag/curves/lag_curve_", format(final_date, "%Y-%m"), ".rds"))
+A <- readRDS(paste0(
+  "~/TreeScan-implementation/treescan_project/lag/curves/lag_curve_",
+  format(final_date, "%Y-%m"),
+  ".rds"
+))
 DFW <- readRDS("~/TreeScan-implementation/treescan_project/data/data for lag/data_For_lag.rds")
 
+# Helper: safely close only the device opened for a PNG file
+safe_dev_off <- function(dev_id) {
+  if (!is.null(dev_id) && dev_id %in% dev.list()) {
+    dev.set(dev_id)
+    dev.off()
+  }
+}
 
-if (length(unique(valid_nodes)) > 0){
+if (length(unique(valid_nodes)) > 0) {
   
   # Loop over lags
-  for (lag in initial_lags){
+  for (lag in initial_lags) {
     print(paste0("We are now assessing lag ", lag))
     
-    # Common cause (these are for the dummy nodes that link different parts of the tree)
+    # Common cause: dummy nodes that link different parts of the tree
     common_cause <- read.csv(paste0(parent_dir, "/data/common cause file final.csv"))
-    common_cause <- common_cause[is.na(common_cause$X4)==F,]
+    common_cause <- common_cause[is.na(common_cause$X4) == FALSE, ]
     
-    # check if any of the signals are for dummy node and if any, add the different linked nodes to the identifier value separated by "|"
-    common_cause_codes <- TS_Results_today$Node.Identifier[grepl(paste(common_cause$X2,collapse="|"),gsub("2\\-|1\\-|0\\-","",TS_Results_today$Node.Identifier))]
-    if(length(common_cause_codes)>0){
-      for(i in 1:length(common_cause_codes))
-      {
-        TS_Results_today$Node.Name[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)] =TS_Results_today$Node.Identifier[grepl(paste(gsub("2\\-","2\\\\-",gsub("1\\-","1\\\\-",common_cause_codes[i]))),TS_Results_today$Node.Identifier)]
-        list_codes <- common_cause$X1[grepl(paste(gsub("1\\-|2\\-","",common_cause_codes[i])),common_cause$X2)]
-        TS_Results_today$Node.Identifier[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)]=paste0(c(TS_Results_today$Node.Name[grepl(paste(common_cause_codes[i]),TS_Results_today$Node.Identifier)],list_codes),collapse="|")
+    # Check if any signals are dummy nodes. If yes, add linked nodes to identifier, separated by "|".
+    common_cause_codes <- TS_Results_today$Node.Identifier[
+      grepl(
+        paste(common_cause$X2, collapse = "|"),
+        gsub("2\\-|1\\-|0\\-", "", TS_Results_today$Node.Identifier)
+      )
+    ]
+    
+    if (length(common_cause_codes) > 0) {
+      for (i in seq_along(common_cause_codes)) {
+        idx <- grepl(
+          paste(gsub("2\\-", "2\\\\-", gsub("1\\-", "1\\\\-", common_cause_codes[i]))),
+          TS_Results_today$Node.Identifier
+        )
+        
+        TS_Results_today$Node.Name[idx] <- TS_Results_today$Node.Identifier[idx]
+        
+        list_codes <- common_cause$X1[
+          grepl(paste(gsub("1\\-|2\\-", "", common_cause_codes[i])), common_cause$X2)
+        ]
+        
+        idx2 <- grepl(paste(common_cause_codes[i]), TS_Results_today$Node.Identifier)
+        TS_Results_today$Node.Identifier[idx2] <- paste0(
+          c(TS_Results_today$Node.Name[idx2], list_codes),
+          collapse = "|"
+        )
       }
     }
-  
-    # For time trend we need to download some background data
+    
+    # For time trend
     Nodes <- TS_Results_today$Node.Identifier.after_dash <- sub(".*-", "", TS_Results_today$Node.Identifier)
     
     # -----------------------------
@@ -58,11 +87,8 @@ if (length(unique(valid_nodes)) > 0){
     lookback_str <- format(lookback_dates, "%Y-%m-%d")
     
     results_dir <- file.path(parent_dir, "results")
-    
-    # Create full paths to each date directory
     date_dirs <- file.path(results_dir, lookback_dates)
     
-    # List all CSV files within those directories
     old_reports <- unlist(
       lapply(date_dirs, function(dir) {
         list.files(
@@ -147,7 +173,7 @@ if (length(unique(valid_nodes)) > 0){
     # -----------------------------
     # 5) Assign trend
     # -----------------------------
-    if (nrow(TS_Results_today) > 0){
+    if (nrow(TS_Results_today) > 0) {
       TS_Results_today$Trend <- NA_character_
     }
     
@@ -239,7 +265,7 @@ if (length(unique(valid_nodes)) > 0){
       )
     }
     
-    if (nrow(TS_Results_today) > 0){
+    if (nrow(TS_Results_today) > 0) {
       TS_Results_today <- TS_Results_today[order(TS_Results_today$Trend, TS_Results_today$Node.Identifier), ]
       TS_Results_today <- TS_Results_today[, c("Trend", setdiff(names(TS_Results_today), "Trend"))]
     }
@@ -250,7 +276,6 @@ if (length(unique(valid_nodes)) > 0){
   
   # Automatically grab all objects named TS_Results_Today_*
   df_names <- ls(pattern = "^TS_Results_Today_\\d+$")
-  
   df_list <- mget(df_names)
   
   # Add lag number to each data frame and bind together
@@ -264,20 +289,6 @@ if (length(unique(valid_nodes)) > 0){
   })
   
   # For each Node.Identifier, keep the row from the smallest lag
-  # base_rows <- all_data %>%
-  #   group_by(Node.Identifier) %>%
-  #   arrange(lag, .by_group = TRUE) %>%
-  #   slice(1) %>%
-  #   ungroup() %>%
-  #   select(
-  #     Trend,
-  #     Node.Identifier,
-  #     Node.Name,
-  #     Recurrence.Interval,
-  #     Relative.Risk,
-  #     lag
-  #   )
-  
   base_rows <- all_data %>%
     group_by(Node.Identifier) %>%
     arrange(lag, .by_group = TRUE) %>%
@@ -294,19 +305,6 @@ if (length(unique(valid_nodes)) > 0){
       names_prefix = "LAG ",
       values_fill = "NO"
     )
-  
-  # Add data artifact warning:
-  # YES if present in lag 1 and absent from all other lags
-  # artifact_flag <- all_data %>%
-  #   distinct(Node.Identifier, lag) %>%
-  #   group_by(Node.Identifier) %>%
-  #   summarise(
-  #     in_lag1 = any(lag == 1),
-  #     in_other_lags = any(lag != 1),
-  #     `Data artifact warning` = if_else(in_lag1 & !in_other_lags, "YES", "NO"),
-  #     .groups = "drop"
-  #   ) %>%
-  #   select(Node.Identifier, `Data artifact warning`)
   
   positive_threshold <- 0.10
   negative_threshold <- -0.10
@@ -329,17 +327,12 @@ if (length(unique(valid_nodes)) > 0){
     ) %>%
     mutate(
       `Data artifact warning` = if_else(
-        !is.na(artifact_score) &
-          artifact_score >= positive_threshold &
-          in_lag1,
+        !is.na(artifact_score) & artifact_score >= positive_threshold & in_lag1,
         "YES",
         "NO"
       ),
       `Masked in lag 1 warning` = if_else(
-        !is.na(artifact_score) &
-          artifact_score <= negative_threshold &
-          !in_lag1 &
-          in_other_lags,
+        !is.na(artifact_score) & artifact_score <= negative_threshold & !in_lag1 & in_other_lags,
         "YES",
         "NO"
       )
@@ -404,6 +397,7 @@ if (length(unique(valid_nodes)) > 0){
              rows = 2:(nrow(TS_Results_today) + 1),
              cols = ri_idx, gridExpand = TRUE, stack = TRUE)
   }
+  
   if (length(rr_idx) > 0) {
     addStyle(wb, "Signals", num_style,
              rows = 2:(nrow(TS_Results_today) + 1),
@@ -432,20 +426,23 @@ if (length(unique(valid_nodes)) > 0){
   
   # -----------------------------
   # 7) Add plots sheet
+  # SAFER BATCH/TASK-SCHEDULER VERSION:
+  #   - writes each plot to a real PNG file
+  #   - closes the PNG device
+  #   - inserts the finished image into Excel
+  #   - avoids insertPlot(), which can capture blank devices in non-interactive jobs
   # -----------------------------
   addWorksheet(wb, "Plots")
   
-  # optional title
   writeData(wb, "Plots", "Node plots", startRow = 1, startCol = 1)
   addStyle(wb, "Plots",
            createStyle(textDecoration = "bold", fontSize = 14),
            rows = 1, cols = 1)
   
-  # pull the node codes exactly as in your plotting code
   node_identifiers <- TS_Results_today$Node.Identifier
   node_codes <- sub(".*-", "", node_identifiers)
   
-  # layout: 2 plots per row block
+  # Layout: 2 plots per row block
   start_row <- 3
   start_col <- 1
   plot_width <- 6
@@ -455,51 +452,37 @@ if (length(unique(valid_nodes)) > 0){
   
   plot_num <- 0
   
-  # Pull out ICD-like codes from the whole column
-  all_codes <- regmatches(DFW$DischargeDiagnosisUpdates, gregexpr("\\b[A-Z][0-9]{2}(?:\\.[0-9A-Z]+)?\\b", DFW$DischargeDiagnosisUpdates))
+  # Stable directory to hold plot files until the workbook is saved
+  plot_dir <- file.path(parent_dir, "signal_report", "plot_pngs")
+  dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
   
-  # Flatten and count
+  # Pull out ICD-like codes from the whole column once
+  all_codes <- regmatches(
+    DFW$DischargeDiagnosisUpdates,
+    gregexpr("\\b[A-Z][0-9]{2}(?:\\.[0-9A-Z]+)?\\b", DFW$DischargeDiagnosisUpdates)
+  )
+  
   code_counts <- data.table(code = unlist(all_codes))[, .N, by = code][order(-N)]
   code_counts <- sum(code_counts$N)
   
+  if (is.na(code_counts) || code_counts <= 0) {
+    warning("code_counts is zero/NA; proportion plots may be skipped.")
+  }
+  
   for (k in seq_along(node_codes)) {
     print(k)
+    
     i <- node_codes[k]
     node_label <- node_identifiers[k]
     
     which_row <- which(delay_by_code$code == i)
-    
     if (length(which_row) == 0) next
     
-    # if duplicate matches exist, use first one
+    # If duplicate matches exist, use first one
     which_row <- which_row[1]
     
     xvals <- as.numeric(delay_by_code[which_row, 2:101])
-    
-    # skip if all missing
     if (all(is.na(xvals))) next
-    
-    plot_num <- plot_num + 1
-    
-    # position in sheet (2 charts across)
-    block_row <- start_row + ((plot_num - 1) %/% 2) * row_step
-    block_col <- start_col + ((plot_num - 1) %% 2) * col_step
-    
-    # write label above plot
-    writeData(wb, "Plots", node_label, startRow = block_row, startCol = block_col)
-    addStyle(wb, "Plots",
-             createStyle(textDecoration = "bold"),
-             rows = block_row, cols = block_col)
-    
-    # create plot on current graphics device
-    xlim_use <- tryCatch(
-      quantile(xvals, c(0, 0.95), na.rm = TRUE),
-      error = function(e) range(xvals, na.rm = TRUE)
-    )
-    
-    if (any(!is.finite(xlim_use)) || diff(xlim_use) == 0) {
-      xlim_use <- range(xvals, na.rm = TRUE)
-    }
     
     i_esc <- stringr::str_escape(i)
     
@@ -508,15 +491,13 @@ if (length(unique(valid_nodes)) > 0){
       regex(paste0("(?<![A-Z0-9.])", i_esc, "(?![A-Z0-9.])"))
     )]
     
-    num <- sum(num1$count)
+    num <- sum(num1$count, na.rm = TRUE)
     
-    library(stringr)
-    
-    if (num == 0){
+    if (num == 0) {
       num <- sum(str_count(DFW$DischargeDiagnosis, paste0(";", i_esc)), na.rm = TRUE)
     }
     
-    # build the lookup once from your real xvals
+    # Build lookup from actual xvals
     x_lookup <- xvals / 24
     y_lookup <- seq_along(xvals)
     
@@ -542,90 +523,121 @@ if (length(unique(valid_nodes)) > 0){
     }
     
     result <- tryCatch(
-      {
-        get_y_for_x(seq(0, 5, by = 0.01))
-      },
+      get_y_for_x(seq(0, 5, by = 0.01)),
       error = function(e) {
-        message("Skipping")
+        message("Skipping ", i, ": ", conditionMessage(e))
         return(NULL)
       }
     )
     
     if (is.null(result)) next
+    if (is.na(code_counts) || code_counts <= 0) next
     
-    frac <- 100 * (num * get_y_for_x(seq(0, 5, by = 0.01))) / (code_counts * get_y_for_x2(seq(0, 5, by = 0.01)))
+    y1 <- get_y_for_x(seq(0, 5, by = 0.01))
+    y2 <- get_y_for_x2(seq(0, 5, by = 0.01))
+    frac <- 100 * (num * y1) / (code_counts * y2)
     
-    par(mar = c(5, 5, 4, 6) + 0.1)
+    # Guard against bad frac values that would make ylim fail
+    if (all(is.na(frac)) || all(!is.finite(frac))) {
+      message("Skipping ", i, ": frac is all NA/non-finite")
+      next
+    }
     
-    # CDF plot
-    plot(
-      xvals / 24, 1:100,
-      xlim = c(0, 5),
-      pch = 1,
-      main = paste0("Node", node_label, " ESSENCE-upload delay distribution"),
-      xlab = "Time in days",
-      ylab = "Percentage of diagnoses reported after ED visit",
-      type = "l",
-      lwd = 2
-    )
+    frac[!is.finite(frac)] <- NA_real_
     
-    lines(A$x_days, A$y, lty = 2, col = "grey", lwd = 2)
+    plot_num <- plot_num + 1
     
-    # Make an x-axis for frac that is the same length as frac
-    x_frac <- seq(0, 5, length.out = length(frac))
+    block_row <- start_row + ((plot_num - 1) %/% 2) * row_step
+    block_col <- start_col + ((plot_num - 1) %% 2) * col_step
     
-    # Overlay frac with right y-axis
-    par(new = TRUE)
+    writeData(wb, "Plots", node_label, startRow = block_row, startCol = block_col)
+    addStyle(wb, "Plots",
+             createStyle(textDecoration = "bold"),
+             rows = block_row, cols = block_col)
     
-    plot(
-      x_frac, frac,
-      type = "l",
-      axes = FALSE,
-      xlab = "",
-      ylab = "",
-      xlim = c(0, 5),
-      ylim = range(frac, na.rm = TRUE),
-      col = "red"
-    )
+    # Make a safe filename for this plot
+    safe_code <- gsub("[^A-Za-z0-9_.-]", "_", i)
+    plot_file <- file.path(plot_dir, paste0("plot_", sprintf("%04d", plot_num), "_", safe_code, ".png"))
     
-    axis(4, col = "red")
-    mtext("Proportion of diagnoses", side = 4, line = 3)
-    
-    legend(
-      "bottomright",
-      legend = c("ICD-specific code", "Pooled", "Proportion of volume"),
-      lty = c(1, 2, 1),
-      lwd = c(2, 2, 1),
-      col = c("black", "grey", "red"),
-      cex = 0.75,
-      inset = 0.02,
-      bg = "white"
-    )
-    
-    num1 <- DFW[, count := str_count(DischargeDiagnosisUpdates, paste0("\\b", i, "\\b"))]
-    num <- sum(num1$count)
-    
-    # Flatten and count
-    code_counts <- data.table(code = unlist(all_codes))[, .N, by = code][order(-N)]
-    code_counts <- sum(code_counts$N)
-    
-    # insert the current plot into Excel
-    insertPlot(
-      wb,
-      sheet = "Plots",
-      startRow = block_row + 1,
-      startCol = block_col,
+    # Open a real PNG device. This is the key batch-safe change.
+    png(
+      filename = plot_file,
       width = plot_width,
       height = plot_height,
-      fileType = "png",
-      units = "in"
+      units = "in",
+      res = 150
     )
+    dev_id <- dev.cur()
     
-    # clear device so next plot starts fresh
-    dev.off()
+    tryCatch({
+      par(mar = c(5, 5, 4, 6) + 0.1)
+      
+      # CDF plot
+      plot(
+        xvals / 24, 1:100,
+        xlim = c(0, 5),
+        pch = 1,
+        main = paste0("Node ", node_label, " ESSENCE-upload delay distribution"),
+        xlab = "Time in days",
+        ylab = "Percentage of diagnoses reported after ED visit",
+        type = "l",
+        lwd = 2
+      )
+      
+      lines(A$x_days, A$y, lty = 2, col = "grey", lwd = 2)
+      
+      x_frac <- seq(0, 5, length.out = length(frac))
+      
+      # Overlay frac with right y-axis
+      par(new = TRUE)
+      
+      plot(
+        x_frac, frac,
+        type = "l",
+        axes = FALSE,
+        xlab = "",
+        ylab = "",
+        xlim = c(0, 5),
+        ylim = range(frac, na.rm = TRUE),
+        col = "red"
+      )
+      
+      axis(4, col = "red")
+      mtext("Proportion of diagnoses", side = 4, line = 3)
+      
+      legend(
+        "bottomright",
+        legend = c("ICD-specific code", "Pooled", "Proportion of volume"),
+        lty = c(1, 2, 1),
+        lwd = c(2, 2, 1),
+        col = c("black", "grey", "red"),
+        cex = 0.75,
+        inset = 0.02,
+        bg = "white"
+      )
+    }, error = function(e) {
+      message("Plot failed for ", i, ": ", conditionMessage(e))
+    }, finally = {
+      safe_dev_off(dev_id)
+    })
+    
+    # Only insert if the PNG was actually created
+    if (file.exists(plot_file) && file.info(plot_file)$size > 0) {
+      insertImage(
+        wb,
+        sheet = "Plots",
+        file = plot_file,
+        startRow = block_row + 1,
+        startCol = block_col,
+        width = plot_width,
+        height = plot_height,
+        units = "in"
+      )
+    } else {
+      message("PNG was not created for ", i)
+    }
   }
   
-  # set some reasonable column widths
   setColWidths(wb, "Plots", cols = 1:20, widths = 14)
   
   # -----------------------------
@@ -635,6 +647,7 @@ if (length(unique(valid_nodes)) > 0){
   saveWorkbook(wb, out_file, overwrite = TRUE)
   
   message("Workbook saved to: ", out_file)
+  
 } else {
   print("You have no new signals")
 }

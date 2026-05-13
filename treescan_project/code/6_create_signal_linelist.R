@@ -273,8 +273,8 @@ archive_deduped$diagnosistext <- normalize_text_utf8(archive_deduped$Diagnosis_C
 archive_deduped$admitreason <- normalize_text_utf8(archive_deduped$Admit_Reason_Code)
 
 archive_deduped$key <- archive_deduped$C_Unique_Patient_ID
-archive_deduped$hospital <- archive_deduped$Hospital
-archive_deduped$zipcode <- archive_deduped$HospitalZip
+archive_deduped$hospital <- archive_deduped$HospitalName
+archive_deduped$zipcode <- archive_deduped$Patient_Zip
 archive_deduped$patientid <- archive_deduped$C_Unique_Patient_ID
 archive_deduped$sex <- archive_deduped$Sex
 archive_deduped$race <- archive_deduped$C_Race
@@ -539,11 +539,17 @@ for(i in 1:length(valid_nodes))
       type = "n",
       xlim = c(1, 52),
       ylim = c(0, ceiling(max(ed_keep$n, na.rm = TRUE) * 1.1)),
-      xlab = "CDC_Week",
+      xlab = "Month",
       ylab = gsub("2\\-", "", paste(node_codes)),
       xaxt = "n"
     )
-    axis(1, at = seq(1, 52, 2), labels = seq(1, 52, 2), cex.axis = 0.6, las = 2)
+    axis(
+      1,
+      at = c(1, 5, 9, 14, 18, 22, 27, 31, 35, 40, 44, 48),
+      labels = month.abb,
+      cex.axis = 0.7,
+      las = 2
+    )
     
     # Trends where last point we note if partial or full week
     years_plot <- sort(unique(ed_keep$MMWRyear))
@@ -641,6 +647,25 @@ for(i in 1:length(valid_nodes))
     temp1_z$modzcta <- as.character(temp1_z$modzcta)
     modzcta$modzcta <- as.character(modzcta$modzcta)
     
+    # Use HospitalZip to define the map zoom area
+    hospital_zip <- unique(na.omit(substr(as.character(temp$HospitalZip), 1, 5)))
+    
+    hospital_area <- modzcta %>%
+      filter(modzcta %in% hospital_zip)
+    
+    if (nrow(hospital_area) > 0) {
+      bb_hosp <- sf::st_bbox(hospital_area)
+      
+      # Add padding around the hospital ZIP so the plot is not too tightly cropped
+      xpad <- as.numeric(bb_hosp["xmax"] - bb_hosp["xmin"]) * 2
+      ypad <- as.numeric(bb_hosp["ymax"] - bb_hosp["ymin"]) * 2
+      
+      bb_hosp["xmin"] <- bb_hosp["xmin"] - xpad
+      bb_hosp["xmax"] <- bb_hosp["xmax"] + xpad
+      bb_hosp["ymin"] <- bb_hosp["ymin"] - ypad
+      bb_hosp["ymax"] <- bb_hosp["ymax"] + ypad
+    }
+    
     modzcta1 <- left_join(modzcta, temp_z, by = "modzcta")
     modzcta_plot <- modzcta1[!is.na(modzcta1$pct), ]
     
@@ -656,8 +681,8 @@ for(i in 1:length(valid_nodes))
           na.value = "grey95"
         ) +
         coord_sf(
-          xlim = c(bb["xmin"], bb["xmax"]),
-          ylim = c(bb["ymin"], bb["ymax"]),
+          xlim = if (exists("bb_hosp") && nrow(hospital_area) > 0) c(bb_hosp["xmin"], bb_hosp["xmax"]) else c(bb["xmin"], bb["xmax"]),
+          ylim = if (exists("bb_hosp") && nrow(hospital_area) > 0) c(bb_hosp["ymin"], bb_hosp["ymax"]) else c(bb["ymin"], bb["ymax"]),
           expand = FALSE
         ) +
         theme_minimal() +
@@ -1663,3 +1688,4 @@ for(i in 1:length(valid_nodes))
   }    
   
 }
+
