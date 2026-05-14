@@ -8,13 +8,10 @@ library(stringr)
 library(tidyr)
 
 delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
+delay_by_code <- readRDS(paste0(parent_dir, "/data_by_code/data_by_code.rds"))
 artifact_scores <- readRDS(paste0(parent_dir, "/data_artifact_assessment/artifact_scores.rds"))
-A <- readRDS(paste0(
-  "~/TreeScan-implementation/treescan_project/lag/curves/lag_curve_",
-  format(final_date, "%Y-%m"),
-  ".rds"
-))
-DFW <- readRDS("~/TreeScan-implementation/treescan_project/data/data for lag/data_For_lag.rds")
+A <- readRDS(paste0(parent_dir, "/lag/curves/lag_curve_", format(final_date, "%Y-%m"), ".rds"))
+DFW <- readRDS(paste0(parent_dir, "/data/data for lag/data_for_lag.rds"))
 
 # Helper: safely close only the device opened for a PNG file
 safe_dev_off <- function(dev_id) {
